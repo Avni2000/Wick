@@ -2,7 +2,7 @@
   "name": "wick",
   "displayName": "Wick",
   "description": "Wick - Algorithmically Trade from VSCode",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "Avni2000",
   "license": "MIT",
   "repository": {
