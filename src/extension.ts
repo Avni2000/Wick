@@ -83,14 +83,18 @@ export function activate(context: vscode.ExtensionContext) {
 				switch (message.command) {
 					case 'fetchStockData':
 						try {
+							const range = message.range || '5y';
+							const interval = message.interval || '1d';
 							const candles = await fetchYahooCandles(
 								message.ticker,
-								message.range || '5y',
-								message.interval || '1d'
+								range,
+								interval
 							);
 							panel.webview.postMessage({
 								type: 'candles',
 								symbol: message.ticker,
+								range: range,
+								interval: interval,
 								candles: candles
 							});
 						} catch (error: any) {
@@ -116,7 +120,7 @@ async function getWebviewContent(ticker: string, extensionUri: vscode.Uri): Prom
 	const template = new TextDecoder().decode(uint8Array);
 	return template
 		.replace('{{ticker}}', ticker) // Replace title (no quotes needed)
-		.replace('{{ticker}}', JSON.stringify(ticker)); // Replace JS variable (needs quotes)
+		.replace('{{ ticker }}', JSON.stringify(ticker)); // Replace JS variable (needs quotes)
 }
 
 export async function fetchYahooCandles(
