@@ -26,10 +26,6 @@
       {
         "command": "wick.showChart",
         "title": "Wick: Show Chart"
-      },
-      {
-        "command": "wick.openDashboard",
-        "title": "Wick: Open Dashboard"
       }
     ],
     "viewsContainers": {

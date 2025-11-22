@@ -48,19 +48,4 @@ suite('Wick Extension Test Suite', () => {
 		disposable.dispose();
 		assert.ok(true, 'Webview creation test completed');
 	});
-
-	test('Command "wick.openDashboard" should be registered', async () => {
-		const commands = await vscode.commands.getCommands(true);
-		const dashboardCommand = commands.find(cmd => cmd === 'wick.openDashboard');
-		assert.ok(dashboardCommand, 'Command "wick.openDashboard" not found');
-	});
-
-	test('Command "wick.openDashboard" should execute without errors', async () => {
-		try {
-			await vscode.commands.executeCommand('wick.openDashboard');
-			assert.ok(true, 'Dashboard command executed successfully');
-		} catch (error) {
-			assert.fail(`Dashboard command execution failed: ${error}`);
-		}
-	});
 });

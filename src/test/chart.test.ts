@@ -25,15 +25,6 @@ suite('Chart Webview Test Suite', () => {
         assert.ok(true, 'Multiple chart instances can be created');
     });
 
-    test('Dashboard webview should be created', async function () {
-        this.timeout(5000);
-
-        // Execute the dashboard command
-        await vscode.commands.executeCommand('wick.openDashboard');
-
-        assert.ok(true, 'Dashboard command executed successfully');
-    });
-
     test('Chart data structure validation', () => {
         // Test that our sample data structure is valid
         const sampleData = [
@@ -52,20 +43,6 @@ suite('Chart Webview Test Suite', () => {
             assert.ok(candle.high >= candle.close, 'High should be >= Close');
             assert.ok(candle.low <= candle.open, 'Low should be <= Open');
             assert.ok(candle.low <= candle.close, 'Low should be <= Close');
-        });
-    });
-
-    test('Line chart data structure validation', () => {
-        // Test line chart data structure
-        const lineData = [
-            { time: '2024-01-01', value: 100 },
-            { time: '2024-01-02', value: 105 },
-        ];
-
-        lineData.forEach(point => {
-            assert.ok(point.time, 'Data point should have time');
-            assert.ok(typeof point.value === 'number', 'Value should be a number');
-            assert.ok(point.value > 0, 'Value should be positive');
         });
     });
 
