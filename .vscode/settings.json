@@ -1,0 +1,17 @@
+{
+  "mochaExplorer.files": "out/test/**/*.test.js",
+  "mochaExplorer.require": "out/test/runTest.js",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "files.exclude": {
+    "out": false,
+    "dist": false
+  },
+  "search.exclude": {
+    "out": true,
+    "dist": true
+  }
+}
