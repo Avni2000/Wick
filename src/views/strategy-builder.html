@@ -389,6 +389,143 @@
             padding: 6px;
             border-radius: 4px;
         }
+
+        /* Tabs */
+        .tab-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .tab-header {
+            display: flex;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding-left: 10px;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* Collapsible Sidebars */
+        .sidebar,
+        .code-panel {
+            transition: width 0.3s ease, min-width 0.3s ease;
+            position: relative;
+        }
+
+        .sidebar.collapsed {
+            width: 40px !important;
+            min-width: 40px !important;
+            overflow: hidden;
+        }
+
+        .code-panel.collapsed {
+            width: 40px !important;
+            min-width: 40px !important;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed .panel-header,
+        .sidebar.collapsed .drag-items,
+        .code-panel.collapsed .panel-header,
+        .code-panel.collapsed .code-preview,
+        .code-panel.collapsed .backtest-config {
+            opacity: 0;
+            pointer-events: none;
+            display: none;
+            /* Hide content when collapsed */
+        }
+
+        .collapse-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .collapse-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .sidebar.collapsed .collapse-btn,
+        .code-panel.collapsed .collapse-btn {
+            right: 50%;
+            transform: translateX(50%);
+            top: 12px;
+        }
+
+        .sidebar.collapsed .collapse-btn i,
+        .code-panel.collapsed .collapse-btn i {
+            transform: rotate(180deg);
+        }
+
+        /* Results Tab Specifics */
+        #resultsContent {
+            padding: 20px;
+            overflow-y: auto;
+            height: 100%;
+        }
+
+        /* Adjust Main Container for Tabs */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            flex-direction: column;
+            /* Changed to column to stack tabs */
+        }
+
+        /* Workspace needs to fill flex */
+        .workspace-wrapper {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
     </style>
 </head>
 
@@ -409,85 +546,107 @@
     </div>
 
     <div class="main-container">
-        <div class="sidebar">
-            <div class="panel-header">Logic</div>
-            <div class="drag-items">
-                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="and">
-                    <i class="fas fa-link" style="color: #EF5350;"></i> AND
-                </div>
-                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="or">
-                    <i class="fas fa-project-diagram" style="color: #EF5350;"></i> OR
-                </div>
-            </div>
+        <div class="tab-header">
+            <button class="tab-btn active" data-tab="builder">Builder</button>
+            <button class="tab-btn" data-tab="results">Results</button>
+        </div>
 
-            <div class="panel-header">Indicators</div>
-            <div class="drag-items">
-                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="price">
-                    <i class="fas fa-dollar-sign" style="color: #66BB6A;"></i> Price
-                </div>
-                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="rsi">
-                    <i class="fas fa-chart-line" style="color: #7E57C2;"></i> RSI
-                </div>
-                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="sma">
-                    <i class="fas fa-wave-square" style="color: #42A5F5;"></i> SMA
-                </div>
-                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="ema">
-                    <i class="fas fa-wave-square" style="color: #26C6DA;"></i> EMA
-                </div>
-                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="macd">
-                    <i class="fas fa-chart-bar" style="color: #FF7043;"></i> MACD
-                </div>
-                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="bb">
-                    <i class="fas fa-ruler-combined" style="color: #AB47BC;"></i> Bollinger Bands
-                </div>
-            </div>
+        <!-- Builder Tab -->
+        <div class="tab-content active" id="tab-builder">
+            <div class="workspace-wrapper">
+                <div class="sidebar" id="leftSidebar">
+                    <button class="collapse-btn" onclick="toggleSidebar('leftSidebar')">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <div class="panel-header">Logic</div>
+                    <div class="drag-items">
+                        <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="and">
+                            <i class="fas fa-link" style="color: #EF5350;"></i> AND
+                        </div>
+                        <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="or">
+                            <i class="fas fa-project-diagram" style="color: #EF5350;"></i> OR
+                        </div>
+                    </div>
 
-            <div class="panel-header">Actions</div>
-            <div class="drag-items">
-                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="action">
-                    <i class="fas fa-bolt" style="color: #FFA726;"></i> Action
+                    <div class="panel-header">Indicators</div>
+                    <div class="drag-items">
+                        <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="price">
+                            <i class="fas fa-dollar-sign" style="color: #66BB6A;"></i> Price
+                        </div>
+                        <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="rsi">
+                            <i class="fas fa-chart-line" style="color: #7E57C2;"></i> RSI
+                        </div>
+                        <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="sma">
+                            <i class="fas fa-wave-square" style="color: #42A5F5;"></i> SMA
+                        </div>
+                        <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="ema">
+                            <i class="fas fa-wave-square" style="color: #26C6DA;"></i> EMA
+                        </div>
+                        <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="macd">
+                            <i class="fas fa-chart-bar" style="color: #FF7043;"></i> MACD
+                        </div>
+                        <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="bb">
+                            <i class="fas fa-ruler-combined" style="color: #AB47BC;"></i> Bollinger Bands
+                        </div>
+                    </div>
+
+                    <div class="panel-header">Actions</div>
+                    <div class="drag-items">
+                        <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="action">
+                            <i class="fas fa-bolt" style="color: #FFA726;"></i> Action
+                        </div>
+                    </div>
+                </div>
+
+                <div class="workspace-panel">
+                    <div id="drawflow" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+                </div>
+
+                <div class="code-panel" id="rightSidebar">
+                    <button class="collapse-btn" onclick="toggleSidebar('rightSidebar')">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <div class="panel-header">Generated Python</div>
+                    <div class="code-preview">
+                        <pre id="codePreview"># Build your flow to generate code...</pre>
+                    </div>
+
+                    <div class="panel-header">Configuration</div>
+                    <div class="backtest-config">
+                        <div class="config-group">
+                            <label>Ticker Symbol</label>
+                            <input type="text" id="tickerInput" placeholder="GOOGL" value="GOOGL" />
+                        </div>
+                        <div class="config-group">
+                            <label>Start Date</label>
+                            <input type="date" id="startDate" value="2020-01-01" />
+                        </div>
+                        <div class="config-group">
+                            <label>End Date</label>
+                            <input type="date" id="endDate" value="2024-01-01" />
+                        </div>
+                    </div>
+                    <div class="panel-header">Sync Settings</div>
+                    <div class="backtest-config">
+                        <button class="btn btn-secondary" id="pullFromChartBtn"
+                            style="width: 100%; justify-content: center;">
+                            <i class="fas fa-sync-alt" style="margin-right: 6px;"></i>
+                            Pull from Chart
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="workspace-panel">
-            <div id="drawflow" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
-        </div>
-
-        <div class="code-panel">
-            <div class="panel-header">Generated Python</div>
-            <div class="code-preview">
-                <pre id="codePreview"># Build your flow to generate code...</pre>
-            </div>
-
-            <div class="panel-header">Configuration</div>
-            <div class="backtest-config">
-                <div class="config-group">
-                    <label>Ticker Symbol</label>
-                    <input type="text" id="tickerInput" placeholder="GOOGL" value="GOOGL" />
+        <!-- Results Tab -->
+        <div class="tab-content" id="tab-results">
+            <div id="resultsContent">
+                <div style="text-align: center; color: var(--text-secondary); margin-top: 50px;">
+                    <i class="fas fa-chart-area" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
+                    <p>Run a backtest to see results here.</p>
                 </div>
-                <div class="config-group">
-                    <label>Start Date</label>
-                    <input type="date" id="startDate" value="2020-01-01" />
-                </div>
-                <div class="config-group">
-                    <label>End Date</label>
-                    <input type="date" id="endDate" value="2024-01-01" />
-                </div>
-            </div>
-            <div class="panel-header">Sync Settings</div>
-            <div class="backtest-config">
-                <button class="btn btn-secondary" id="pullFromChartBtn" style="width: 100%; justify-content: center;">
-                    <i class="fas fa-sync-alt" style="margin-right: 6px;"></i>
-                    Pull from Chart
-                </button>
             </div>
         </div>
-    </div>
-
-    <div class="results-panel" id="resultsPanel">
-        <div class="panel-header">Backtest Results</div>
-        <div id="resultsContent"></div>
     </div>
 
     <script>
@@ -793,7 +952,7 @@
 
             if (nextLines.length === 0) {
                 document.getElementById('codePreview').textContent = '# Connect nodes to an Action to generate code...';
-                return;
+                return null;
             }
 
             const fullCode = `from backtesting import Strategy, Backtest
@@ -807,6 +966,7 @@ class FlowStrategy(Strategy):
         ${nextLines.join('\n        ')}`;
 
             document.getElementById('codePreview').textContent = fullCode;
+            return fullCode;
         }
 
         // Update code on any change
@@ -837,90 +997,163 @@ class FlowStrategy(Strategy):
             }
         });
 
-        // --- Controls ---
+        // --- Tab Logic ---
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
 
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            editor.clear();
-            generateCode();
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.getAttribute('data-tab');
+                switchTab(tabId);
+            });
         });
 
-        document.getElementById('exampleBtn').addEventListener('click', () => {
-            editor.clear();
+        function switchTab(tabId) {
+            // Update buttons
+            tabBtns.forEach(btn => {
+                if (btn.getAttribute('data-tab') === tabId) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
 
-            // Add nodes manually to simulate loading
-            // RSI (Consolidated)
-            editor.addNode('rsi', 0, 1, 100, 100, 'rsi', { period: 14, op: '<', value: 30 }, html_rsi);
+            // Update content
+            tabContents.forEach(content => {
+                if (content.id === `tab-${tabId}`) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+        }
 
-            // Action Buy
-            editor.addNode('action', 1, 0, 400, 100, 'action', { action: 'buy' }, html_action);
+        // --- Sidebar Logic ---
+        function toggleSidebar(sidebarId) {
+            const sidebar = document.getElementById(sidebarId);
+            sidebar.classList.toggle('collapsed');
 
-            // Connect them
-            // RSI -> Action
-            editor.addConnection(1, 2, 'output_1', 'input_1');
+            // Trigger resize for Drawflow to adjust
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+            }, 300);
+        }
 
-            generateCode();
-        });
+        // --- VS Code Message Handling ---
 
         document.getElementById('runBacktestBtn').addEventListener('click', () => {
-            const code = document.getElementById('codePreview').textContent;
-            if (code.includes('# Connect nodes')) {
-                alert('Please build a strategy first!');
-                return;
-            }
+            const code = generateCode();
+            if (!code) return;
 
             const config = {
-                ticker: document.getElementById('tickerInput').value.toUpperCase(),
+                ticker: document.getElementById('tickerInput').value,
                 start: document.getElementById('startDate').value,
                 end: document.getElementById('endDate').value,
                 strategy_code: code
             };
 
-            const resultsPanel = document.getElementById('resultsPanel');
-            const resultsContent = document.getElementById('resultsContent');
-            resultsPanel.classList.add('visible');
-            resultsContent.innerHTML = '<div style="padding:20px;text-align:center;">Running backtest...</div>';
-
             vscode.postMessage({
                 command: 'runBacktest',
                 config: config
             });
+
+            // Switch to results tab
+            switchTab('results');
         });
 
-        window.addEventListener('message', event => {
-            const message = event.data;
-            if (message.type === 'backtestResults') {
-                const r = message.results;
-                document.getElementById('resultsContent').innerHTML = `
-                    <div class="results-grid">
-                        <div class="metric-card"><div class="metric-label">Return</div><div class="metric-value ${r.return >= 0 ? 'positive' : 'negative'}">${r.return.toFixed(2)}%</div></div>
-                        <div class="metric-card"><div class="metric-label">Sharpe</div><div class="metric-value">${r.sharpe.toFixed(2)}</div></div>
-                        <div class="metric-card"><div class="metric-label">Drawdown</div><div class="metric-value negative">${r.max_drawdown.toFixed(2)}%</div></div>
-                        <div class="metric-card"><div class="metric-label">Trades</div><div class="metric-value">${r.num_trades}</div></div>
-                        <div class="metric-card"><div class="metric-label">Win Rate</div><div class="metric-value">${r.win_rate.toFixed(1)}%</div></div>
-                    </div>
-                `;
-            } else if (message.type === 'backtestError') {
-                document.getElementById('resultsContent').innerHTML = `<div style="color:#f48771;padding:10px;">Error: ${message.error}</div>`;
-            } else if (message.type === 'chartState') {
-                // Update ticker
-                if (message.ticker) {
-                    document.getElementById('tickerInput').value = message.ticker;
-                }
-                // Update timeline
-                if (message.start) document.getElementById('startDate').value = new Date(message.start * 1000).toISOString().split('T')[0];
-                if (message.end) document.getElementById('endDate').value = new Date(message.end * 1000).toISOString().split('T')[0];
-            }
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            editor.clearModuleSelected();
         });
 
-        // Sync Logic
+        document.getElementById('exampleBtn').addEventListener('click', () => {
+            // Simple RSI Strategy Example
+            editor.clearModuleSelected();
+
+            // Add nodes
+            addNodeToDrawflow('rsi', 100, 100);
+            addNodeToDrawflow('action', 500, 100);
+
+            // Connect them (Manual connection simulation or just visual placement)
+            // Note: Drawflow programmatic connection is a bit complex, 
+            // for now we just place them. User can connect.
+
+            // Actually, let's try to connect them if possible, but IDs are dynamic.
+            // We'll just place them for now.
+        });
+
         document.getElementById('pullFromChartBtn').addEventListener('click', () => {
             vscode.postMessage({
                 command: 'requestChartState'
             });
         });
 
+        window.addEventListener('message', event => {
+            const message = event.data;
+            switch (message.type) {
+                case 'backtestResults':
+                    displayResults(message.results);
+                    break;
+                case 'backtestError':
+                    displayResults({ error: message.error });
+                    break;
+                case 'chartState':
+                    if (message.ticker) document.getElementById('tickerInput').value = message.ticker;
+                    if (message.start) document.getElementById('startDate').value = new Date(message.start * 1000).toISOString().split('T')[0];
+                    if (message.end) document.getElementById('endDate').value = new Date(message.end * 1000).toISOString().split('T')[0];
+                    break;
+            }
+        });
+
+        function displayResults(results) {
+            const container = document.getElementById('resultsContent');
+            if (results.error) {
+                container.innerHTML = `<div style="color: var(--danger-color); padding: 20px;">Error: ${results.error}</div>`;
+                return;
+            }
+
+            // Format metrics
+            // Keys match backtest_runner.py output: return, sharpe, max_drawdown, win_rate, num_trades
+            const metrics = [
+                { label: 'Return', value: results.return, format: v => `${parseFloat(v).toFixed(2)}%` },
+                { label: 'Sharpe Ratio', value: results.sharpe, format: v => parseFloat(v).toFixed(2) },
+                { label: 'Max Drawdown', value: results.max_drawdown, format: v => `${parseFloat(v).toFixed(2)}%` },
+                { label: 'Win Rate', value: results.win_rate, format: v => `${parseFloat(v).toFixed(2)}%` },
+                { label: 'Trades', value: results.num_trades, format: v => v }
+            ];
+
+            let html = '<div class="results-grid">';
+            metrics.forEach(m => {
+                const val = m.value;
+                const formatted = m.format(val);
+                let colorClass = '';
+                if (m.label === 'Return' || m.label === 'Sharpe Ratio') {
+                    colorClass = parseFloat(val) > 0 ? 'positive' : 'negative';
+                }
+
+                html += `
+                    <div class="metric-card">
+                        <div class="metric-label">${m.label}</div>
+                        <div class="metric-value ${colorClass}">${formatted}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            // Add full raw results below
+            html += '<div style="margin-top: 20px; padding: 10px; background: var(--bg-secondary); border-radius: 4px;">';
+            html += '<h3 style="font-size: 12px; margin-bottom: 10px; color: var(--text-secondary);">Full Report</h3>';
+            html += '<pre style="font-size: 11px; color: var(--text-secondary); overflow: auto;">' + JSON.stringify(results, null, 2) + '</pre>';
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
         // Init
-        setTimeout(() => document.getElementById('exampleBtn').click(), 100);
+        setTimeout(() => {
+            if (document.getElementById('exampleBtn')) {
+                document.getElementById('exampleBtn').click();
+            }
+        }, 100);
 
     </script>
 </body>
