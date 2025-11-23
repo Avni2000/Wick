@@ -43,20 +43,29 @@ def main():
         # Capitalize column names (handle both string and Index)
         data.columns = [str(col).capitalize() for col in data.columns]
         
-        # Execute strategy code to define RSIStrategy class
+        # Execute strategy code to define strategy class
         exec_globals = {'Strategy': Strategy, 'Backtest': Backtest, 'pd': pd}
         if talib:
             exec_globals['talib'] = talib
         exec(strategy_code, exec_globals)
         
-        # Get the strategy class
-        RSIStrategy = exec_globals.get('RSIStrategy')
-        if not RSIStrategy:
-            print(json.dumps({'error': 'RSIStrategy class not found in generated code'}))
+        # Find the strategy class dynamically
+        strategy_class = None
+        for name, obj in exec_globals.items():
+            if isinstance(obj, type) and issubclass(obj, Strategy) and obj is not Strategy:
+                strategy_class = obj
+                break
+        
+        if not strategy_class:
+            # Fallback to checking for specific names if dynamic lookup fails
+            strategy_class = exec_globals.get('RSIStrategy') or exec_globals.get('FlowStrategy')
+
+        if not strategy_class:
+            print(json.dumps({'error': 'No valid Strategy class found in generated code'}))
             sys.exit(1)
         
         # Run backtest
-        bt = Backtest(data, RSIStrategy, cash=10000, commission=.002)
+        bt = Backtest(data, strategy_class, cash=10000, commission=.002)
         stats = bt.run()
         
         # Extract equity curve

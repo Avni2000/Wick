@@ -293,6 +293,16 @@
                         priceEl.textContent = 'Error: ' + message.message;
                         priceEl.style.color = '#ef5350';
                         break;
+
+                    case 'requestChartState':
+                        const visibleRange = chart.timeScale().getVisibleRange();
+                        vscode.postMessage({
+                            command: 'chartState',
+                            ticker: currentTicker,
+                            start: visibleRange ? visibleRange.from : null,
+                            end: visibleRange ? visibleRange.to : null
+                        });
+                        break;
                 }
             });
         })();

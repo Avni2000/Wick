@@ -265,10 +265,20 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
+	// Store panel references
+	let chartPanel: vscode.WebviewPanel | undefined = undefined;
+	let strategyBuilderPanel: vscode.WebviewPanel | undefined = undefined;
+
 	// The commandId parameter must match the command field in package.json
 	const disposable = vscode.commands.registerCommand('wick.showChart', async () => {
+		// If panel already exists, reveal it
+		if (chartPanel) {
+			chartPanel.reveal(vscode.ViewColumn.One);
+			return;
+		}
+
 		// Create and show a new webview panel
-		const panel = vscode.window.createWebviewPanel(
+		chartPanel = vscode.window.createWebviewPanel(
 			'wickChart', // Identifies the type of the webview. Used internally
 			'Wick Chart', // Title of the panel displayed to the user
 			vscode.ViewColumn.One, // Editor column to show the new webview panel in.
@@ -277,11 +287,16 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		);
 
+		// Handle panel disposal
+		chartPanel.onDidDispose(() => {
+			chartPanel = undefined;
+		}, null, context.subscriptions);
+
 		// Set the webview's HTML content
-		panel.webview.html = await getWebviewContent('GOOGL', context.extensionUri);
+		chartPanel.webview.html = await getWebviewContent('GOOGL', context.extensionUri);
 
 		// Handle messages from the webview (for fetching data)
-		panel.webview.onDidReceiveMessage(
+		chartPanel.webview.onDidReceiveMessage(
 			async message => {
 				switch (message.command) {
 					case 'fetchStockData':
@@ -293,7 +308,7 @@ export function activate(context: vscode.ExtensionContext) {
 								range,
 								interval
 							);
-							panel.webview.postMessage({
+							chartPanel?.webview.postMessage({
 								type: 'candles',
 								symbol: message.ticker,
 								range: range,
@@ -301,9 +316,20 @@ export function activate(context: vscode.ExtensionContext) {
 								candles: candles
 							});
 						} catch (error: any) {
-							panel.webview.postMessage({
+							chartPanel?.webview.postMessage({
 								type: 'error',
 								message: error.message
+							});
+						}
+						break;
+					case 'chartState':
+						// Forward to Strategy Builder if it exists
+						if (strategyBuilderPanel) {
+							strategyBuilderPanel.webview.postMessage({
+								type: 'chartState',
+								ticker: message.ticker,
+								start: message.start,
+								end: message.end
 							});
 						}
 						break;
@@ -325,34 +351,53 @@ export function activate(context: vscode.ExtensionContext) {
 	// Register strategy builder command
 	context.subscriptions.push(
 		vscode.commands.registerCommand('wick.showStrategyBuilder', async () => {
-			const panel = vscode.window.createWebviewPanel(
+			// If panel already exists, reveal it
+			if (strategyBuilderPanel) {
+				strategyBuilderPanel.reveal(vscode.ViewColumn.Beside);
+				return;
+			}
+
+			strategyBuilderPanel = vscode.window.createWebviewPanel(
 				'wickStrategyBuilder',
 				'Strategy Builder',
-				vscode.ViewColumn.One,
+				vscode.ViewColumn.Beside, // Open beside the current editor (Split Screen)
 				{
 					enableScripts: true,
 					retainContextWhenHidden: true
 				}
 			);
 
+			// Handle panel disposal
+			strategyBuilderPanel.onDidDispose(() => {
+				strategyBuilderPanel = undefined;
+			}, null, context.subscriptions);
+
 			// Set the webview's HTML content
-			panel.webview.html = await getStrategyBuilderContent(context.extensionUri);
+			strategyBuilderPanel.webview.html = await getStrategyBuilderContent(context.extensionUri);
 
 			// Handle messages from the webview
-			panel.webview.onDidReceiveMessage(
+			strategyBuilderPanel.webview.onDidReceiveMessage(
 				async message => {
 					switch (message.command) {
 						case 'runBacktest':
 							try {
 								const results = await runBacktest(message.config, context.extensionUri);
-								panel.webview.postMessage({
+								strategyBuilderPanel?.webview.postMessage({
 									type: 'backtestResults',
 									results: results
 								});
 							} catch (error: any) {
-								panel.webview.postMessage({
+								strategyBuilderPanel?.webview.postMessage({
 									type: 'backtestError',
 									error: error.message
+								});
+							}
+							break;
+						case 'requestChartState':
+							// Forward to Chart if it exists
+							if (chartPanel) {
+								chartPanel.webview.postMessage({
+									type: 'requestChartState'
 								});
 							}
 							break;

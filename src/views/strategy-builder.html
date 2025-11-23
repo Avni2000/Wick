@@ -6,11 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Strategy Builder</title>
 
-    <!-- Blockly.js from CDN -->
-    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
-    <script src="https://unpkg.com/blockly/python_compressed.js"></script>
+    <!-- Drawflow CSS & JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/jerosoler/Drawflow/dist/drawflow.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/css/all.min.css">
 
     <style>
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1e1e1e;
+            --bg-tertiary: #252526;
+            --border-color: #333333;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --accent-color: #007fd4;
+            --accent-hover: #0060a0;
+            --danger-color: #f48771;
+            --success-color: #89d185;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -18,60 +33,73 @@
         }
 
         body {
-            font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
-            background: var(--vscode-editor-background, #1e1e1e);
-            color: var(--vscode-foreground, #cccccc);
+            font-family: var(--font-family);
+            background: var(--bg-primary);
+            color: var(--text-primary);
             height: 100vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
+        /* Header */
         .header {
-            padding: 12px 16px;
-            background: var(--vscode-sideBar-background, #252526);
-            border-bottom: 1px solid var(--vscode-panel-border, #3e3e42);
+            height: 50px;
+            padding: 0 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            z-index: 10;
         }
 
         .header h1 {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--vscode-foreground, #cccccc);
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .header-controls {
             display: flex;
-            gap: 8px;
+            gap: 10px;
         }
 
+        /* Buttons */
         .btn {
-            background: var(--vscode-button-background, #0e639c);
-            color: var(--vscode-button-foreground, #ffffff);
+            background: var(--accent-color);
+            color: #ffffff;
             border: none;
-            padding: 6px 14px;
-            border-radius: 2px;
+            padding: 8px 16px;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 13px;
             font-weight: 500;
-            transition: background 0.2s;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .btn:hover {
-            background: var(--vscode-button-hoverBackground, #1177bb);
+            background: var(--accent-hover);
         }
 
         .btn-secondary {
-            background: var(--vscode-button-secondaryBackground, #3a3d41);
-            color: var(--vscode-button-secondaryForeground, #cccccc);
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
         }
 
         .btn-secondary:hover {
-            background: var(--vscode-button-secondaryHoverBackground, #45494e);
+            background: var(--bg-tertiary);
+            border-color: #555;
         }
 
+        /* Main Layout */
         .main-container {
             display: flex;
             flex: 1;
@@ -82,89 +110,214 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            border-right: 1px solid var(--vscode-panel-border, #3e3e42);
+            position: relative;
+            background: var(--bg-primary);
+            background-size: 20px 20px;
+            background-image: radial-gradient(#333 1px, transparent 1px);
         }
 
-        #blocklyDiv {
-            flex: 1;
+        #drawflow {
             width: 100%;
+            height: 100%;
+            text-align: initial;
+            background: transparent;
+        }
+
+        /* Sidebar / Code Panel */
+        .sidebar {
+            width: 250px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 5;
         }
 
         .code-panel {
-            width: 400px;
+            width: 350px;
             display: flex;
             flex-direction: column;
-            background: var(--vscode-sideBar-background, #252526);
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 5;
         }
 
         .panel-header {
-            padding: 8px 12px;
-            background: var(--vscode-sideBarSectionHeader-background, #2d2d30);
-            border-bottom: 1px solid var(--vscode-panel-border, #3e3e42);
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            border-top: 1px solid var(--border-color);
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: var(--vscode-sideBarSectionHeader-foreground, #cccccc);
+            color: var(--text-secondary);
         }
 
+        .panel-header:first-child {
+            border-top: none;
+        }
+
+        /* Draggable Items */
+        .drag-items {
+            padding: 10px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .drag-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 8px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+
+        .drag-item:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-1px);
+        }
+
+        .drag-item i {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Drawflow Node Styles */
+        .drawflow .drawflow-node {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            width: 200px;
+            padding: 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .drawflow .drawflow-node.selected {
+            background: var(--bg-secondary);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(0, 127, 212, 0.3);
+        }
+
+        .drawflow .drawflow-node .input,
+        .drawflow .drawflow-node .output {
+            width: 10px;
+            height: 10px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            border: 1px solid var(--bg-primary);
+        }
+
+        .drawflow .drawflow-node .input:hover,
+        .drawflow .drawflow-node .output:hover {
+            background: var(--accent-color);
+        }
+
+        .node-header {
+            padding: 8px 12px;
+            border-radius: 6px 6px 0 0;
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .node-body {
+            padding: 12px;
+        }
+
+        .node-body input,
+        .node-body select {
+            width: 100%;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        /* Node Colors */
+        .header-indicator {
+            background: #7E57C2;
+        }
+
+        .header-logic {
+            background: #42A5F5;
+        }
+
+        .header-value {
+            background: #26A69A;
+        }
+
+        .header-action {
+            background: #FFA726;
+            color: #1e1e1e !important;
+        }
+
+        .header-logic {
+            background: #EF5350;
+        }
+
+        .header-price {
+            background: #66BB6A;
+        }
+
+        /* Compact inputs in nodes */
+        .node-row {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+            align-items: center;
+        }
+
+        .node-row label {
+            font-size: 10px;
+            color: #aaa;
+            min-width: 30px;
+        }
+
+        .node-row select,
+        .node-row input {
+            margin-top: 0;
+            padding: 4px;
+        }
+
+        /* Code Preview */
         .code-preview {
             flex: 1;
             overflow: auto;
-            padding: 12px;
+            padding: 0;
+            background: var(--bg-primary);
         }
 
         .code-preview pre {
-            background: var(--vscode-editor-background, #1e1e1e);
-            padding: 12px;
-            border-radius: 4px;
-            border: 1px solid var(--vscode-panel-border, #3e3e42);
-            overflow-x: auto;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            margin: 0;
+            padding: 16px;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
             font-size: 12px;
-            line-height: 1.5;
-            color: var(--vscode-editor-foreground, #d4d4d4);
+            line-height: 1.6;
+            color: #d4d4d4;
+            background: transparent;
+            border: none;
         }
 
-        .backtest-config {
-            padding: 12px;
-            border-top: 1px solid var(--vscode-panel-border, #3e3e42);
-        }
-
-        .config-group {
-            margin-bottom: 12px;
-        }
-
-        .config-group label {
-            display: block;
-            font-size: 12px;
-            margin-bottom: 4px;
-            color: var(--vscode-descriptionForeground, #9d9d9d);
-        }
-
-        .config-group input {
-            width: 100%;
-            background: var(--vscode-input-background, #3c3c3c);
-            color: var(--vscode-input-foreground, #cccccc);
-            border: 1px solid var(--vscode-input-border, #3e3e42);
-            padding: 6px 8px;
-            border-radius: 2px;
-            font-size: 13px;
-            font-family: inherit;
-        }
-
-        .config-group input:focus {
-            outline: none;
-            border-color: var(--vscode-focusBorder, #007acc);
-        }
-
+        /* Results Panel */
         .results-panel {
             display: none;
-            padding: 16px;
-            background: var(--vscode-editor-background, #1e1e1e);
-            border-top: 1px solid var(--vscode-panel-border, #3e3e42);
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
             max-height: 300px;
             overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
         }
 
         .results-panel.visible {
@@ -173,80 +326,145 @@
 
         .results-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1px;
+            background: var(--border-color);
+            padding: 1px;
         }
 
         .metric-card {
-            background: var(--vscode-sideBar-background, #252526);
-            padding: 12px;
-            border-radius: 4px;
-            border: 1px solid var(--vscode-panel-border, #3e3e42);
+            background: var(--bg-secondary);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
 
         .metric-label {
             font-size: 11px;
-            color: var(--vscode-descriptionForeground, #9d9d9d);
-            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
         }
 
         .metric-value {
-            font-size: 20px;
-            font-weight: 600;
+            font-size: 24px;
+            font-weight: 300;
+            color: var(--text-primary);
         }
 
         .metric-value.positive {
-            color: #26a69a;
+            color: var(--success-color);
         }
 
         .metric-value.negative {
-            color: #ef5350;
+            color: var(--danger-color);
         }
 
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: var(--vscode-descriptionForeground, #9d9d9d);
+        /* Config Forms */
+        .backtest-config {
+            padding: 16px;
+            background: var(--bg-secondary);
         }
 
-        .error {
-            background: rgba(239, 83, 80, 0.1);
-            border: 1px solid #ef5350;
-            color: #ef5350;
-            padding: 12px;
+        .config-group {
+            margin-bottom: 12px;
+        }
+
+        .config-group label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .config-group input {
+            width: 100%;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px;
             border-radius: 4px;
-            margin-top: 12px;
         }
     </style>
 </head>
 
 <body>
     <div class="header">
-        <h1>📊 Visual Strategy Builder</h1>
+        <h1>
+            <i class="fas fa-project-diagram" style="margin-right: 8px; color: var(--accent-color);"></i>
+            Strategy Flow
+        </h1>
         <div class="header-controls">
             <button class="btn btn-secondary" id="clearBtn">Clear</button>
             <button class="btn btn-secondary" id="exampleBtn">Load Example</button>
-            <button class="btn" id="runBacktestBtn">Run Backtest</button>
+            <button class="btn" id="runBacktestBtn">
+                <i class="fas fa-play" style="margin-right: 6px;"></i>
+                Run Backtest
+            </button>
         </div>
     </div>
 
     <div class="main-container">
+        <div class="sidebar">
+            <div class="panel-header">Logic</div>
+            <div class="drag-items">
+                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="and">
+                    <i class="fas fa-link" style="color: #EF5350;"></i> AND
+                </div>
+                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="or">
+                    <i class="fas fa-project-diagram" style="color: #EF5350;"></i> OR
+                </div>
+            </div>
+
+            <div class="panel-header">Indicators</div>
+            <div class="drag-items">
+                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="price">
+                    <i class="fas fa-dollar-sign" style="color: #66BB6A;"></i> Price
+                </div>
+                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="rsi">
+                    <i class="fas fa-chart-line" style="color: #7E57C2;"></i> RSI
+                </div>
+                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="sma">
+                    <i class="fas fa-wave-square" style="color: #42A5F5;"></i> SMA
+                </div>
+                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="ema">
+                    <i class="fas fa-wave-square" style="color: #26C6DA;"></i> EMA
+                </div>
+                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="macd">
+                    <i class="fas fa-chart-bar" style="color: #FF7043;"></i> MACD
+                </div>
+                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="bb">
+                    <i class="fas fa-ruler-combined" style="color: #AB47BC;"></i> Bollinger Bands
+                </div>
+            </div>
+
+            <div class="panel-header">Actions</div>
+            <div class="drag-items">
+                <div class="drag-item" draggable="true" ondragstart="drag(event)" data-node="action">
+                    <i class="fas fa-bolt" style="color: #FFA726;"></i> Action
+                </div>
+            </div>
+        </div>
+
         <div class="workspace-panel">
-            <div id="blocklyDiv"></div>
+            <div id="drawflow" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
         </div>
 
         <div class="code-panel">
-            <div class="panel-header">Generated Python Code</div>
+            <div class="panel-header">Generated Python</div>
             <div class="code-preview">
-                <pre id="codePreview"># Drag blocks to generate code...</pre>
+                <pre id="codePreview"># Build your flow to generate code...</pre>
             </div>
 
-            <div class="panel-header">Backtest Configuration</div>
+            <div class="panel-header">Configuration</div>
             <div class="backtest-config">
                 <div class="config-group">
                     <label>Ticker Symbol</label>
-                    <input type="text" id="tickerInput" placeholder="AAPL" value="AAPL" />
+                    <input type="text" id="tickerInput" placeholder="GOOGL" value="GOOGL" />
                 </div>
                 <div class="config-group">
                     <label>Start Date</label>
@@ -256,6 +474,13 @@
                     <label>End Date</label>
                     <input type="date" id="endDate" value="2024-01-01" />
                 </div>
+            </div>
+            <div class="panel-header">Sync Settings</div>
+            <div class="backtest-config">
+                <button class="btn btn-secondary" id="pullFromChartBtn" style="width: 100%; justify-content: center;">
+                    <i class="fas fa-sync-alt" style="margin-right: 6px;"></i>
+                    Pull from Chart
+                </button>
             </div>
         </div>
     </div>
@@ -267,320 +492,379 @@
 
     <script>
         const vscode = acquireVsCodeApi();
+        var id = document.getElementById("drawflow");
+        const editor = new Drawflow(id);
+        editor.reroute = true;
+        editor.start();
 
-        // Define custom blocks
-        Blockly.defineBlocksWithJsonArray([
-            // RSI Indicator Block
-            {
-                "type": "rsi_indicator",
-                "message0": "RSI with period %1",
-                "args0": [
-                    {
-                        "type": "field_number",
-                        "name": "PERIOD",
-                        "value": 14,
-                        "min": 1,
-                        "max": 100
-                    }
-                ],
-                "output": "Number",
-                "colour": 230,
-                "tooltip": "Calculate RSI (Relative Strength Index)",
-                "helpUrl": ""
-            },
-            // Comparison Block
-            {
-                "type": "comparison",
-                "message0": "%1 %2 %3",
-                "args0": [
-                    {
-                        "type": "input_value",
-                        "name": "A"
-                    },
-                    {
-                        "type": "field_dropdown",
-                        "name": "OP",
-                        "options": [
-                            ["<", "LT"],
-                            [">", "GT"],
-                            ["==", "EQ"],
-                            ["<=", "LTE"],
-                            [">=", "GTE"]
-                        ]
-                    },
-                    {
-                        "type": "input_value",
-                        "name": "B"
-                    }
-                ],
-                "output": "Boolean",
-                "colour": 210,
-                "tooltip": "Compare two values",
-                "helpUrl": ""
-            },
-            // Number Block
-            {
-                "type": "number_input",
-                "message0": "%1",
-                "args0": [
-                    {
-                        "type": "field_number",
-                        "name": "NUM",
-                        "value": 30
-                    }
-                ],
-                "output": "Number",
-                "colour": 290,
-                "tooltip": "A number value",
-                "helpUrl": ""
-            },
-            // Buy Action Block
-            {
-                "type": "buy_action",
-                "message0": "Buy when %1",
-                "args0": [
-                    {
-                        "type": "input_value",
-                        "name": "CONDITION",
-                        "check": "Boolean"
-                    }
-                ],
-                "previousStatement": null,
-                "nextStatement": null,
-                "colour": 120,
-                "tooltip": "Buy when condition is true",
-                "helpUrl": ""
-            },
-            // Sell Action Block
-            {
-                "type": "sell_action",
-                "message0": "Sell when %1",
-                "args0": [
-                    {
-                        "type": "input_value",
-                        "name": "CONDITION",
-                        "check": "Boolean"
-                    }
-                ],
-                "previousStatement": null,
-                "nextStatement": null,
-                "colour": 0,
-                "tooltip": "Sell when condition is true",
-                "helpUrl": ""
+        // --- Node Templates ---
+
+        const html_and = `
+            <div class="node-header header-logic"><i class="fas fa-link"></i> AND</div>
+            <div class="node-body">
+                <div style="font-size:10px; color:#aaa;">All inputs must be true</div>
+            </div>
+        `;
+
+        const html_or = `
+            <div class="node-header header-logic"><i class="fas fa-project-diagram"></i> OR</div>
+            <div class="node-body">
+                <div style="font-size:10px; color:#aaa;">Any input must be true</div>
+            </div>
+        `;
+
+        const html_price = `
+            <div class="node-header header-price"><i class="fas fa-dollar-sign"></i> Price</div>
+            <div class="node-body">
+                <div class="node-row">
+                    <select df-source style="width: 100%">
+                        <option value="Close">Close</option>
+                        <option value="Open">Open</option>
+                        <option value="High">High</option>
+                        <option value="Low">Low</option>
+                    </select>
+                </div>
+                <div class="node-row">
+                    <select df-op style="width: 60px">
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                        <option value=">=">>=</option>
+                        <option value="<="><=</option>
+                        <option value="==">==</option>
+                    </select>
+                    <input type="number" df-value value="100" style="width: 80px">
+                </div>
+            </div>
+        `;
+
+        const html_rsi = `
+            <div class="node-header header-indicator"><i class="fas fa-chart-line"></i> RSI</div>
+            <div class="node-body">
+                <div class="node-row">
+                    <label>Len</label>
+                    <input type="number" df-period value="14" min="1">
+                </div>
+                <div class="node-row">
+                    <select df-op style="width: 60px">
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                        <option value=">=">>=</option>
+                        <option value="<="><=</option>
+                    </select>
+                    <input type="number" df-value value="30" style="width: 80px">
+                </div>
+            </div>
+        `;
+
+        const html_sma = `
+            <div class="node-header header-indicator" style="background: #42A5F5;"><i class="fas fa-wave-square"></i> SMA</div>
+            <div class="node-body">
+                <div class="node-row">
+                    <label>Len</label>
+                    <input type="number" df-period value="20" min="1">
+                </div>
+                <div class="node-row">
+                    <select df-op style="width: 60px">
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                    </select>
+                    <input type="number" df-value value="100" style="width: 80px">
+                </div>
+            </div>
+        `;
+
+        const html_ema = `
+            <div class="node-header header-indicator" style="background: #26C6DA;"><i class="fas fa-wave-square"></i> EMA</div>
+            <div class="node-body">
+                <div class="node-row">
+                    <label>Len</label>
+                    <input type="number" df-period value="20" min="1">
+                </div>
+                <div class="node-row">
+                    <select df-op style="width: 60px">
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                    </select>
+                    <input type="number" df-value value="100" style="width: 80px">
+                </div>
+            </div>
+        `;
+
+        const html_macd = `
+            <div class="node-header header-indicator" style="background: #FF7043;"><i class="fas fa-chart-bar"></i> MACD</div>
+            <div class="node-body">
+                <div class="node-row">
+                    <label>Fast</label> <input type="number" df-fast value="12" style="width:40px">
+                    <label>Slow</label> <input type="number" df-slow value="26" style="width:40px">
+                </div>
+                <div class="node-row">
+                    <label>Sig</label> <input type="number" df-signal value="9" style="width:40px">
+                </div>
+                <div class="node-row">
+                    <label>MACD</label>
+                    <select df-op style="width: 40px">
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                    </select>
+                    <label>Sig</label>
+                </div>
+            </div>
+        `;
+
+        const html_bb = `
+            <div class="node-header header-indicator" style="background: #AB47BC;"><i class="fas fa-ruler-combined"></i> BB</div>
+            <div class="node-body">
+                <div class="node-row">
+                    <label>Len</label> <input type="number" df-period value="20" style="width:40px">
+                    <label>Std</label> <input type="number" df-std value="2" style="width:40px">
+                </div>
+                <div class="node-row">
+                    <label>Close</label>
+                    <select df-op style="width: 40px">
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                    </select>
+                    <select df-band style="width: 60px">
+                        <option value="upper">Upper</option>
+                        <option value="lower">Lower</option>
+                    </select>
+                </div>
+            </div>
+        `;
+
+        const html_action = `
+            <div class="node-header header-action"><i class="fas fa-bolt"></i> Action</div>
+            <div class="node-body">
+                <select df-action>
+                    <option value="buy">Buy</option>
+                    <option value="sell">Sell</option>
+                </select>
+            </div>
+        `;
+
+        // --- Drag & Drop Logic ---
+
+        function allowDrop(ev) {
+            ev.preventDefault();
+        }
+
+        function drag(ev) {
+            ev.dataTransfer.setData("node", ev.target.getAttribute('data-node'));
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const nodeType = ev.dataTransfer.getData("node");
+            addNodeToDrawflow(nodeType, ev.clientX, ev.clientY);
+        }
+
+        function addNodeToDrawflow(name, pos_x, pos_y) {
+            if (editor.editor_mode === 'fixed') {
+                return false;
             }
-        ]);
 
-        // Python code generators - must be defined using pythonGenerator object
-        const pythonGenerator = Blockly.Python;
+            // Adjust for canvas position
+            pos_x = pos_x * (editor.precanvas.clientWidth / (editor.precanvas.clientWidth * editor.zoom)) - (editor.precanvas.getBoundingClientRect().x * (editor.precanvas.clientWidth / (editor.precanvas.clientWidth * editor.zoom)));
+            pos_y = pos_y * (editor.precanvas.clientHeight / (editor.precanvas.clientHeight * editor.zoom)) - (editor.precanvas.getBoundingClientRect().y * (editor.precanvas.clientHeight / (editor.precanvas.clientHeight * editor.zoom)));
 
-        pythonGenerator.forBlock['rsi_indicator'] = function (block, generator) {
-            const period = block.getFieldValue('PERIOD');
-            return ['self.rsi', pythonGenerator.ORDER_ATOMIC];
-        };
-
-        pythonGenerator.forBlock['comparison'] = function (block, generator) {
-            const OPERATORS = {
-                'LT': '<',
-                'GT': '>',
-                'EQ': '==',
-                'LTE': '<=',
-                'GTE': '>='
-            };
-            const operator = OPERATORS[block.getFieldValue('OP')];
-            const argument0 = generator.valueToCode(block, 'A', pythonGenerator.ORDER_RELATIONAL) || '0';
-            const argument1 = generator.valueToCode(block, 'B', pythonGenerator.ORDER_RELATIONAL) || '0';
-            const code = argument0 + ' ' + operator + ' ' + argument1;
-            return [code, pythonGenerator.ORDER_RELATIONAL];
-        };
-
-        pythonGenerator.forBlock['number_input'] = function (block, generator) {
-            const number = block.getFieldValue('NUM');
-            return [number, pythonGenerator.ORDER_ATOMIC];
-        };
-
-        pythonGenerator.forBlock['buy_action'] = function (block, generator) {
-            const condition = generator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
-            return `if ${condition}:\n    if not self.position:\n        self.buy()\n`;
-        };
-
-        pythonGenerator.forBlock['sell_action'] = function (block, generator) {
-            const condition = generator.valueToCode(block, 'CONDITION', pythonGenerator.ORDER_NONE) || 'False';
-            return `if ${condition}:\n    if self.position:\n        self.position.close()\n`;
-        };
-
-        // Initialize Blockly workspace
-        const workspace = Blockly.inject('blocklyDiv', {
-            toolbox: {
-                "kind": "categoryToolbox",
-                "contents": [
-                    {
-                        "kind": "category",
-                        "name": "Indicators",
-                        "colour": "230",
-                        "contents": [
-                            {
-                                "kind": "block",
-                                "type": "rsi_indicator"
-                            }
-                        ]
-                    },
-                    {
-                        "kind": "category",
-                        "name": "Logic",
-                        "colour": "210",
-                        "contents": [
-                            {
-                                "kind": "block",
-                                "type": "comparison"
-                            }
-                        ]
-                    },
-                    {
-                        "kind": "category",
-                        "name": "Values",
-                        "colour": "290",
-                        "contents": [
-                            {
-                                "kind": "block",
-                                "type": "number_input"
-                            }
-                        ]
-                    },
-                    {
-                        "kind": "category",
-                        "name": "Actions",
-                        "colour": "120",
-                        "contents": [
-                            {
-                                "kind": "block",
-                                "type": "buy_action"
-                            },
-                            {
-                                "kind": "block",
-                                "type": "sell_action"
-                            }
-                        ]
-                    }
-                ]
-            },
-            grid: {
-                spacing: 20,
-                length: 3,
-                colour: '#3e3e42',
-                snap: true
-            },
-            zoom: {
-                controls: true,
-                wheel: true,
-                startScale: 1.0,
-                maxScale: 3,
-                minScale: 0.3,
-                scaleSpeed: 1.2
-            },
-            trashcan: true
-        });
-
-        // Update code preview when workspace changes
-        function updateCodePreview() {
-            try {
-                Blockly.Python.INFINITE_LOOP_TRAP = null;
-                const blockCode = Blockly.Python.workspaceToCode(workspace);
-
-                if (!blockCode.trim()) {
-                    document.getElementById('codePreview').textContent = '# Drag blocks to generate code...';
-                    return;
-                }
-
-                // Get RSI period from blocks
-                let rsiPeriod = 14;
-                const blocks = workspace.getAllBlocks();
-                blocks.forEach(block => {
-                    if (block.type === 'rsi_indicator') {
-                        rsiPeriod = block.getFieldValue('PERIOD');
-                    }
-                });
-
-                // Generate complete Python code
-                const fullCode = `from backtesting import Strategy, Backtest
-import talib
-
-class RSIStrategy(Strategy):
-    rsi_period = ${rsiPeriod}
-    
-    def init(self):
-        self.rsi = self.I(talib.RSI, self.data.Close, self.rsi_period)
-    
-    def next(self):
-        ${blockCode.trim().split('\n').join('\n        ')}`;
-
-                document.getElementById('codePreview').textContent = fullCode;
-            } catch (e) {
-                console.error('Code generation error:', e);
+            switch (name) {
+                case 'and':
+                    editor.addNode('and', 1, 1, pos_x, pos_y, 'and', {}, html_and);
+                    break;
+                case 'or':
+                    editor.addNode('or', 1, 1, pos_x, pos_y, 'or', {}, html_or);
+                    break;
+                case 'price':
+                    editor.addNode('price', 0, 1, pos_x, pos_y, 'price', { source: 'Close', op: '>', value: 100 }, html_price);
+                    break;
+                case 'rsi':
+                    editor.addNode('rsi', 0, 1, pos_x, pos_y, 'rsi', { period: 14, op: '>', value: 30 }, html_rsi);
+                    break;
+                case 'sma':
+                    editor.addNode('sma', 0, 1, pos_x, pos_y, 'sma', { period: 20, op: '>', value: 100 }, html_sma);
+                    break;
+                case 'ema':
+                    editor.addNode('ema', 0, 1, pos_x, pos_y, 'ema', { period: 20, op: '>', value: 100 }, html_ema);
+                    break;
+                case 'macd':
+                    editor.addNode('macd', 0, 1, pos_x, pos_y, 'macd', { fast: 12, slow: 26, signal: 9, op: '>' }, html_macd);
+                    break;
+                case 'bb':
+                    editor.addNode('bb', 0, 1, pos_x, pos_y, 'bb', { period: 20, std: 2, op: '>', band: 'upper' }, html_bb);
+                    break;
+                case 'action':
+                    editor.addNode('action', 1, 0, pos_x, pos_y, 'action', { action: 'buy' }, html_action);
+                    break;
             }
         }
 
-        workspace.addChangeListener(updateCodePreview);
+        // --- Code Generation Logic ---
 
-        // Load example strategy
-        document.getElementById('exampleBtn').addEventListener('click', () => {
-            workspace.clear();
+        // --- Code Generation Logic ---
 
-            const xmlText = `
-                <xml xmlns="https://developers.google.com/blockly/xml">
-                    <block type="buy_action" x="100" y="100">
-                        <value name="CONDITION">
-                            <block type="comparison">
-                                <field name="OP">LT</field>
-                                <value name="A">
-                                    <block type="rsi_indicator">
-                                        <field name="PERIOD">14</field>
-                                    </block>
-                                </value>
-                                <value name="B">
-                                    <block type="number_input">
-                                        <field name="NUM">30</field>
-                                    </block>
-                                </value>
-                            </block>
-                        </value>
-                        <next>
-                            <block type="sell_action">
-                                <value name="CONDITION">
-                                    <block type="comparison">
-                                        <field name="OP">GT</field>
-                                        <value name="A">
-                                            <block type="rsi_indicator">
-                                                <field name="PERIOD">14</field>
-                                            </block>
-                                        </value>
-                                        <value name="B">
-                                            <block type="number_input">
-                                                <field name="NUM">70</field>
-                                            </block>
-                                        </value>
-                                    </block>
-                                </value>
-                            </block>
-                        </next>
-                    </block>
-                </xml>
-            `;
-            const xml = Blockly.utils.xml.textToDom(xmlText);
-            Blockly.Xml.domToWorkspace(xml, workspace);
+        function generateCode() {
+            const data = editor.export();
+            const nodes = data.drawflow.Home.data;
+            let initLines = new Set();
+            let nextLines = [];
+
+            // Helper to register indicator
+            function registerIndicator(node) {
+                const id = node.id;
+                const d = node.data;
+                switch (node.name) {
+                    case 'rsi':
+                        initLines.add(`self.rsi_${id} = self.I(talib.RSI, self.data.Close, ${d.period})`);
+                        return `self.rsi_${id}[-1]`;
+                    case 'sma':
+                        initLines.add(`self.sma_${id} = self.I(talib.SMA, self.data.Close, ${d.period})`);
+                        return `self.sma_${id}[-1]`;
+                    case 'ema':
+                        initLines.add(`self.ema_${id} = self.I(talib.EMA, self.data.Close, ${d.period})`);
+                        return `self.ema_${id}[-1]`;
+                    case 'macd':
+                        initLines.add(`self.macd_${id}, self.macdsignal_${id}, _ = self.I(talib.MACD, self.data.Close, ${d.fast}, ${d.slow}, ${d.signal})`);
+                        return { macd: `self.macd_${id}[-1]`, signal: `self.macdsignal_${id}[-1]` };
+                    case 'bb':
+                        initLines.add(`self.upper_${id}, self.middle_${id}, self.lower_${id} = self.I(talib.BBANDS, self.data.Close, ${d.period}, ${d.std}, ${d.std})`);
+                        return { upper: `self.upper_${id}[-1]`, lower: `self.lower_${id}[-1]`, middle: `self.middle_${id}[-1]` };
+                    case 'price':
+                        return `self.data.${d.source}[-1]`;
+                }
+                return null;
+            }
+
+            // Recursive condition tracer
+            function traceCondition(nodeId, visited = new Set()) {
+                if (visited.has(nodeId)) return null; // Cycle detection
+                visited.add(nodeId);
+
+                const node = nodes[nodeId];
+                if (!node) return null;
+
+                if (node.name === 'and' || node.name === 'or') {
+                    const inputs = node.inputs.input_1.connections;
+                    if (inputs.length === 0) return null;
+
+                    const conditions = [];
+                    for (const conn of inputs) {
+                        const cond = traceCondition(conn.node, new Set(visited));
+                        if (cond) conditions.push(cond);
+                    }
+
+                    if (conditions.length === 0) return null;
+                    const joinOp = node.name === 'and' ? ' and ' : ' or ';
+                    return `(${conditions.join(joinOp)})`;
+                }
+
+                // Indicator nodes (Leaf nodes for logic)
+                const val = registerIndicator(node);
+                if (!val) return null;
+
+                const d = node.data;
+                if (node.name === 'macd') {
+                    return `${val.macd} ${d.op} ${val.signal}`;
+                } else if (node.name === 'bb') {
+                    return `self.data.Close[-1] ${d.op} ${val[d.band]}`;
+                } else {
+                    // RSI, SMA, EMA, Price
+                    return `${val} ${d.op} ${d.value}`;
+                }
+            }
+
+            // Find Action nodes
+            for (const id in nodes) {
+                const node = nodes[id];
+                if (node.name === 'action') {
+                    const inputs = node.inputs.input_1.connections;
+                    if (inputs.length > 0) {
+                        // Trace back from action
+                        const condition = traceCondition(inputs[0].node);
+                        if (condition) {
+                            if (node.data.action === 'buy') {
+                                nextLines.push(`if ${condition}:\n            if not self.position:\n                self.buy()`);
+                            } else {
+                                nextLines.push(`if ${condition}:\n            if self.position:\n                self.position.close()`);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (nextLines.length === 0) {
+                document.getElementById('codePreview').textContent = '# Connect nodes to an Action to generate code...';
+                return;
+            }
+
+            const fullCode = `from backtesting import Strategy, Backtest
+import talib
+
+class FlowStrategy(Strategy):
+    def init(self):
+        ${Array.from(initLines).join('\n        ') || 'pass'}
+    
+    def next(self):
+        ${nextLines.join('\n        ')}`;
+
+            document.getElementById('codePreview').textContent = fullCode;
+        }
+
+        // Update code on any change
+        editor.on('nodeCreated', generateCode);
+        editor.on('nodeRemoved', generateCode);
+        editor.on('nodeMoved', generateCode);
+        editor.on('connectionCreated', generateCode);
+        editor.on('connectionRemoved', generateCode);
+        // Listen for input changes in nodes
+        document.addEventListener('input', (e) => {
+            if (e.target.closest('.drawflow-node')) {
+                // Update internal data
+                const nodeId = e.target.closest('.drawflow-node').id.replace('node-', '');
+                const node = editor.getNodeFromId(nodeId);
+
+                if (e.target.hasAttribute('df-period')) node.data.period = e.target.value;
+                if (e.target.hasAttribute('df-value')) node.data.value = e.target.value;
+                if (e.target.hasAttribute('df-op')) node.data.op = e.target.value;
+                if (e.target.hasAttribute('df-action')) node.data.action = e.target.value;
+                if (e.target.hasAttribute('df-source')) node.data.source = e.target.value;
+                if (e.target.hasAttribute('df-fast')) node.data.fast = e.target.value;
+                if (e.target.hasAttribute('df-slow')) node.data.slow = e.target.value;
+                if (e.target.hasAttribute('df-signal')) node.data.signal = e.target.value;
+                if (e.target.hasAttribute('df-std')) node.data.std = e.target.value;
+                if (e.target.hasAttribute('df-band')) node.data.band = e.target.value;
+
+                generateCode();
+            }
         });
 
-        // Clear workspace
+        // --- Controls ---
+
         document.getElementById('clearBtn').addEventListener('click', () => {
-            // Sandboxed webview doesn't allow confirm(), so just clear directly
-            workspace.clear();
+            editor.clear();
+            generateCode();
         });
 
-        // Run backtest
+        document.getElementById('exampleBtn').addEventListener('click', () => {
+            editor.clear();
+
+            // Add nodes manually to simulate loading
+            // RSI (Consolidated)
+            editor.addNode('rsi', 0, 1, 100, 100, 'rsi', { period: 14, op: '<', value: 30 }, html_rsi);
+
+            // Action Buy
+            editor.addNode('action', 1, 0, 400, 100, 'action', { action: 'buy' }, html_action);
+
+            // Connect them
+            // RSI -> Action
+            editor.addConnection(1, 2, 'output_1', 'input_1');
+
+            generateCode();
+        });
+
         document.getElementById('runBacktestBtn').addEventListener('click', () => {
             const code = document.getElementById('codePreview').textContent;
-
-            if (code.includes('# Drag blocks')) {
-                displayError('Please create a strategy first!');
+            if (code.includes('# Connect nodes')) {
+                alert('Please build a strategy first!');
                 return;
             }
 
@@ -591,85 +875,53 @@ class RSIStrategy(Strategy):
                 strategy_code: code
             };
 
-            // Show loading
             const resultsPanel = document.getElementById('resultsPanel');
             const resultsContent = document.getElementById('resultsContent');
             resultsPanel.classList.add('visible');
-            resultsContent.innerHTML = '<div class="loading">Running backtest...</div>';
+            resultsContent.innerHTML = '<div style="padding:20px;text-align:center;">Running backtest...</div>';
 
-            // Send to extension
             vscode.postMessage({
                 command: 'runBacktest',
                 config: config
             });
         });
 
-        // Handle messages from extension
         window.addEventListener('message', event => {
             const message = event.data;
-
-            switch (message.type) {
-                case 'backtestResults':
-                    displayResults(message.results);
-                    break;
-                case 'backtestError':
-                    displayError(message.error);
-                    break;
+            if (message.type === 'backtestResults') {
+                const r = message.results;
+                document.getElementById('resultsContent').innerHTML = `
+                    <div class="results-grid">
+                        <div class="metric-card"><div class="metric-label">Return</div><div class="metric-value ${r.return >= 0 ? 'positive' : 'negative'}">${r.return.toFixed(2)}%</div></div>
+                        <div class="metric-card"><div class="metric-label">Sharpe</div><div class="metric-value">${r.sharpe.toFixed(2)}</div></div>
+                        <div class="metric-card"><div class="metric-label">Drawdown</div><div class="metric-value negative">${r.max_drawdown.toFixed(2)}%</div></div>
+                        <div class="metric-card"><div class="metric-label">Trades</div><div class="metric-value">${r.num_trades}</div></div>
+                        <div class="metric-card"><div class="metric-label">Win Rate</div><div class="metric-value">${r.win_rate.toFixed(1)}%</div></div>
+                    </div>
+                `;
+            } else if (message.type === 'backtestError') {
+                document.getElementById('resultsContent').innerHTML = `<div style="color:#f48771;padding:10px;">Error: ${message.error}</div>`;
+            } else if (message.type === 'chartState') {
+                // Update ticker
+                if (message.ticker) {
+                    document.getElementById('tickerInput').value = message.ticker;
+                }
+                // Update timeline
+                if (message.start) document.getElementById('startDate').value = new Date(message.start * 1000).toISOString().split('T')[0];
+                if (message.end) document.getElementById('endDate').value = new Date(message.end * 1000).toISOString().split('T')[0];
             }
         });
 
-        function displayResults(results) {
-            const resultsContent = document.getElementById('resultsContent');
+        // Sync Logic
+        document.getElementById('pullFromChartBtn').addEventListener('click', () => {
+            vscode.postMessage({
+                command: 'requestChartState'
+            });
+        });
 
-            const html = `
-                <div class="results-grid">
-                    <div class="metric-card">
-                        <div class="metric-label">Total Return</div>
-                        <div class="metric-value ${results.return >= 0 ? 'positive' : 'negative'}">
-                            ${results.return >= 0 ? '+' : ''}${results.return.toFixed(2)}%
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Sharpe Ratio</div>
-                        <div class="metric-value">
-                            ${results.sharpe.toFixed(2)}
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Max Drawdown</div>
-                        <div class="metric-value negative">
-                            ${results.max_drawdown.toFixed(2)}%
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Total Trades</div>
-                        <div class="metric-value">
-                            ${results.num_trades}
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Win Rate</div>
-                        <div class="metric-value">
-                            ${results.win_rate.toFixed(1)}%
-                        </div>
-                    </div>
-                </div>
-            `;
+        // Init
+        setTimeout(() => document.getElementById('exampleBtn').click(), 100);
 
-            resultsContent.innerHTML = html;
-        }
-
-        function displayError(error) {
-            const resultsPanel = document.getElementById('resultsPanel');
-            const resultsContent = document.getElementById('resultsContent');
-            resultsPanel.classList.add('visible');
-            resultsContent.innerHTML = `<div class="error"><strong>Error:</strong> ${error}</div>`;
-        }
-
-        // Initialize with example on first load
-        setTimeout(() => {
-            document.getElementById('exampleBtn').click();
-        }, 500);
     </script>
 </body>
 
