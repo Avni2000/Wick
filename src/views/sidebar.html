@@ -238,14 +238,15 @@
         </div>
 
         <!-- Tabs -->
-        <button class="tab-item active" role="tab" aria-selected="true" data-tab="chart">Chart</button>
-        <button class="tab-item" role="tab" aria-selected="false" data-tab="strategy-builder">Strategy Builder</button>
+        <button class="tab-item" role="tab" aria-selected="false" data-tab="chart">Chart</button>
+        <button class="tab-item active" role="tab" aria-selected="true" data-tab="strategy-builder">Strategy
+            Builder</button>
         <button class="tab-item" role="tab" aria-selected="false" data-tab="custom-backtest">Custom Backtest</button>
 
         <!-- Files/Sections -->
         <div class="files" role="tree">
-            <!-- Chart Content (Initially Active) -->
-            <div id="chart-content" class="tab-content-area active">
+            <!-- Chart Content (Initially Hidden) -->
+            <div id="chart-content" class="tab-content-area">
                 <!-- Chart specific sidebar content can go here if needed -->
             </div>
 
@@ -266,8 +267,8 @@
                 </div>
             </div>
 
-            <!-- Strategy Builder Content -->
-            <div id="strategy-builder-content" class="tab-content-area">
+            <!-- Strategy Builder Content (Initially Active) -->
+            <div id="strategy-builder-content" class="tab-content-area active">
                 <!-- User strategies -->
                 <div class="folder" id="strategies" role="treeitem" aria-expanded="true">
                     <div class="folder-header" tabindex="0" aria-controls="strategies-content"
@@ -320,11 +321,11 @@
             }
         }
 
-        // Initialize: trigger chart if it's the default active tab
+        // Initialize: trigger strategy builder if it's the default active tab
         function initializeSidebar() {
             const activeTab = document.querySelector('.tab-item.active');
-            if (activeTab && activeTab.getAttribute('data-tab') === 'chart') {
-                vscode.postMessage({ command: 'showChart' });
+            if (activeTab && activeTab.getAttribute('data-tab') === 'strategy-builder') {
+                vscode.postMessage({ command: 'showStrategyBuilder' });
             }
             // Request the file list from the extension
             vscode.postMessage({ command: 'requestFileList' });

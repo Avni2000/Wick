@@ -627,16 +627,13 @@ export async function activate(context: vscode.ExtensionContext) {
 		// Open Strategy Builder first (Top/Main)
 		await vscode.commands.executeCommand('wick.showStrategyBuilder');
 
-		// Open Chart (will open beside and move below)
-		await vscode.commands.executeCommand('wick.showChart');
-
-		// Highlight the Chart tab in the sidebar
+		// Highlight the Strategy Builder tab in the sidebar
 		// We need to wait a bit for the sidebar to be ready to receive messages
 		setTimeout(() => {
 			if (provider['_view']) {
 				provider['_view'].webview.postMessage({
 					type: 'setActiveTab',
-					tab: 'chart'
+					tab: 'strategy-builder'
 				});
 			}
 		}, 1000);
