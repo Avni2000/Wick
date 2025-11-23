@@ -26,7 +26,7 @@ def main():
         strategy_code = config['strategy_code']
         
         # Download data
-        data = yf.download(ticker, start=start, end=end, progress=False)
+        data = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
         
         if data.empty:
             print(json.dumps({
@@ -35,7 +35,13 @@ def main():
             sys.exit(1)
         
         # Ensure proper column names for backtesting.py (expects capitalized names)
-        data.columns = [col.capitalize() for col in data.columns]
+        # Handle both single-level and multi-level column indices
+        if isinstance(data.columns, pd.MultiIndex):
+            # For multi-index, get the first level
+            data.columns = data.columns.get_level_values(0)
+        
+        # Capitalize column names (handle both string and Index)
+        data.columns = [str(col).capitalize() for col in data.columns]
         
         # Execute strategy code to define RSIStrategy class
         exec_globals = {'Strategy': Strategy, 'Backtest': Backtest, 'pd': pd}
@@ -76,9 +82,13 @@ def main():
         print(json.dumps(results))
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         print(json.dumps({
-            'error': str(e)
-        }))
+            'error': str(e),
+            'traceback': error_details
+        }), file=sys.stderr)
+        print(json.dumps({'error': str(e)}))
         sys.exit(1)
 
 if __name__ == '__main__':

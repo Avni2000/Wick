@@ -421,25 +421,30 @@ async function runBacktest(config: any, extensionUri: vscode.Uri): Promise<any> 
 				console.log('Stdout:', stdout);
 				console.log('Stderr:', stderr);
 
-				if (code !== 0) {
-					console.error(`Python process exited with code ${code}`);
-					console.error('Stderr:', stderr);
-					reject(new Error(stderr || `Python process exited with code ${code}`));
-					return;
-				}
-
+				// Try to parse stdout regardless of exit code, as errors may be in JSON format
 				try {
 					const result = JSON.parse(stdout);
 
 					// Check if result contains an error
 					if (result.error) {
+						console.error('Python script returned error:', result.error);
+						if (result.traceback) {
+							console.error('Traceback:', result.traceback);
+						}
 						reject(new Error(result.error));
 					} else {
 						resolve(result);
 					}
 				} catch (error: any) {
-					console.error('Failed to parse JSON output:', stdout);
-					reject(new Error(`Failed to parse backtest results: ${error.message}\n\nOutput: ${stdout}`));
+					// If we can't parse JSON and exit code is non-zero, use stderr
+					if (code !== 0) {
+						console.error(`Python process exited with code ${code}`);
+						console.error('Stderr:', stderr);
+						reject(new Error(stderr || `Python process exited with code ${code}`));
+					} else {
+						console.error('Failed to parse JSON output:', stdout);
+						reject(new Error(`Failed to parse backtest results: ${error.message}\n\nOutput: ${stdout}`));
+					}
 				}
 			});
 
