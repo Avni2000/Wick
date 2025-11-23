@@ -538,6 +538,10 @@
         <div class="header-controls">
             <button class="btn btn-secondary" id="clearBtn">Clear</button>
             <button class="btn btn-secondary" id="exampleBtn">Load Example</button>
+            <button class="btn btn-secondary" id="saveStrategyBtn">
+                <i class="fas fa-save" style="margin-right: 6px;"></i>
+                Save Strategy
+            </button>
             <button class="btn" id="runBacktestBtn">
                 <i class="fas fa-play" style="margin-right: 6px;"></i>
                 Run Backtest
@@ -794,10 +798,16 @@
         const html_action = `
             <div class="node-header header-action"><i class="fas fa-bolt"></i> Action</div>
             <div class="node-body">
-                <select df-action>
-                    <option value="buy">Buy</option>
-                    <option value="sell">Sell</option>
+                <select df-action onchange="toggleActionSize(this)">
+                    <option value="buy_all">Buy (All Cash)</option>
+                    <option value="buy_shares">Buy (Shares)</option>
+                    <option value="sell_all">Sell (All Position)</option>
+                    <option value="sell_shares">Sell (Shares)</option>
                 </select>
+                <div class="node-row" df-size-container style="display: none; margin-top: 8px;">
+                    <label>Shares</label>
+                    <input type="number" df-size value="100" min="1" style="width: 100%;">
+                </div>
             </div>
         `;
 
@@ -852,7 +862,7 @@
                     editor.addNode('bb', 0, 1, pos_x, pos_y, 'bb', { period: 20, std: 2, op: '>', band: 'upper' }, html_bb);
                     break;
                 case 'action':
-                    editor.addNode('action', 1, 0, pos_x, pos_y, 'action', { action: 'buy' }, html_action);
+                    editor.addNode('action', 1, 0, pos_x, pos_y, 'action', { action: 'buy_all', size: 100 }, html_action);
                     break;
             }
         }
@@ -940,10 +950,17 @@
                         // Trace back from action
                         const condition = traceCondition(inputs[0].node);
                         if (condition) {
-                            if (node.data.action === 'buy') {
+                            const actionType = node.data.action;
+                            const size = node.data.size;
+
+                            if (actionType === 'buy_all') {
                                 nextLines.push(`if ${condition}:\n            if not self.position:\n                self.buy()`);
-                            } else {
+                            } else if (actionType === 'buy_shares') {
+                                nextLines.push(`if ${condition}:\n            if not self.position:\n                self.buy(size=${size})`);
+                            } else if (actionType === 'sell_all') {
                                 nextLines.push(`if ${condition}:\n            if self.position:\n                self.position.close()`);
+                            } else if (actionType === 'sell_shares') {
+                                nextLines.push(`if ${condition}:\n            if self.position:\n                self.sell(size=${size})`);
                             }
                         }
                     }
@@ -975,6 +992,20 @@ class FlowStrategy(Strategy):
         editor.on('nodeMoved', generateCode);
         editor.on('connectionCreated', generateCode);
         editor.on('connectionRemoved', generateCode);
+
+        // Helper function to toggle size input visibility
+        window.toggleActionSize = function (selectEl) {
+            const nodeBody = selectEl.closest('.node-body');
+            const sizeContainer = nodeBody.querySelector('[df-size-container]');
+            const action = selectEl.value;
+
+            if (action === 'buy_shares' || action === 'sell_shares') {
+                sizeContainer.style.display = 'flex';
+            } else {
+                sizeContainer.style.display = 'none';
+            }
+        };
+
         // Listen for input changes in nodes
         document.addEventListener('input', (e) => {
             if (e.target.closest('.drawflow-node')) {
@@ -986,6 +1017,7 @@ class FlowStrategy(Strategy):
                 if (e.target.hasAttribute('df-value')) node.data.value = e.target.value;
                 if (e.target.hasAttribute('df-op')) node.data.op = e.target.value;
                 if (e.target.hasAttribute('df-action')) node.data.action = e.target.value;
+                if (e.target.hasAttribute('df-size')) node.data.size = e.target.value;
                 if (e.target.hasAttribute('df-source')) node.data.source = e.target.value;
                 if (e.target.hasAttribute('df-fast')) node.data.fast = e.target.value;
                 if (e.target.hasAttribute('df-slow')) node.data.slow = e.target.value;
@@ -1041,6 +1073,21 @@ class FlowStrategy(Strategy):
 
         // --- VS Code Message Handling ---
 
+        document.getElementById('saveStrategyBtn').addEventListener('click', () => {
+            const code = generateCode();
+            if (!code) {
+                // If no code, maybe alert or just return. 
+                // The generateCode function updates the preview text if empty.
+                return;
+            }
+
+            // Send code to extension to handle saving (native input box)
+            vscode.postMessage({
+                command: 'requestSaveStrategy',
+                code: code
+            });
+        });
+
         document.getElementById('runBacktestBtn').addEventListener('click', () => {
             const code = generateCode();
             if (!code) return;
@@ -1052,13 +1099,22 @@ class FlowStrategy(Strategy):
                 strategy_code: code
             };
 
+            // Switch to results tab immediately
+            switchTab('results');
+
+            // Show loading state
+            const resultsContainer = document.getElementById('resultsContent');
+            resultsContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary);">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px; color: var(--accent-color);"></i>
+                    <p>Running Backtest...</p>
+                </div>
+            `;
+
             vscode.postMessage({
                 command: 'runBacktest',
                 config: config
             });
-
-            // Switch to results tab
-            switchTab('results');
         });
 
         document.getElementById('clearBtn').addEventListener('click', () => {
@@ -1139,11 +1195,7 @@ class FlowStrategy(Strategy):
             });
             html += '</div>';
 
-            // Add full raw results below
-            html += '<div style="margin-top: 20px; padding: 10px; background: var(--bg-secondary); border-radius: 4px;">';
-            html += '<h3 style="font-size: 12px; margin-bottom: 10px; color: var(--text-secondary);">Full Report</h3>';
-            html += '<pre style="font-size: 11px; color: var(--text-secondary); overflow: auto;">' + JSON.stringify(results, null, 2) + '</pre>';
-            html += '</div>';
+            // Removed raw JSON dump as per user request
 
             container.innerHTML = html;
         }

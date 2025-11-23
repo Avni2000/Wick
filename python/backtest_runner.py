@@ -64,8 +64,8 @@ def main():
             print(json.dumps({'error': 'No valid Strategy class found in generated code'}))
             sys.exit(1)
         
-        # Run backtest
-        bt = Backtest(data, strategy_class, cash=10000, commission=.002)
+        # Run backtest with trade finalization enabled
+        bt = Backtest(data, strategy_class, cash=10000, commission=.002, finalize_trades=True)
         stats = bt.run()
         
         # Extract equity curve

@@ -64,6 +64,15 @@ class WickViewProvider implements vscode.WebviewViewProvider {
 				case 'showStrategyBuilder':
 					vscode.commands.executeCommand('wick.showStrategyBuilder');
 					break;
+				case 'openFile':
+					await this.openStrategyFile(message.fileName);
+					break;
+				case 'openCustomBacktest':
+					await this.openCustomBacktest();
+					break;
+				case 'runCustomBacktest':
+					await this.runCustomBacktest(message.fileName);
+					break;
 			}
 		});
 	}
@@ -211,6 +220,153 @@ def strategy():
 		} catch (error: any) {
 			console.error('Failed to create strategy file:', error);
 			vscode.window.showErrorMessage(`Wick: Failed to create file - ${error.message}`);
+		}
+	}
+
+	private async openCustomBacktest(): Promise<void> {
+		try {
+			const strategiesDir = await this.getStrategiesDirectory();
+			const filePath = vscode.Uri.joinPath(strategiesDir, 'custom_backtest.py');
+
+			// Check if file exists, if not create it from template
+			try {
+				await vscode.workspace.fs.stat(filePath);
+			} catch {
+				// Create template
+				const template = `# Custom Backtest Runner
+# This script allows you to define your own backtesting logic.
+# It receives the strategy filename as the first argument.
+
+import sys
+import os
+import importlib.util
+import yfinance as yf
+import pandas as pd
+from backtesting import Backtest, Strategy
+
+def run_custom_backtest(strategy_file):
+    print(f"Running custom backtest for: {strategy_file}")
+    
+    # 1. Load the strategy module dynamically
+    file_path = os.path.abspath(strategy_file)
+    module_name = os.path.basename(file_path).replace('.py', '')
+    
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if not spec or not spec.loader:
+        print(f"Error: Could not load strategy from {file_path}")
+        return
+
+    strategy_module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = strategy_module
+    spec.loader.exec_module(strategy_module)
+    
+    # Find the strategy class (assuming it's the first class inheriting from Strategy)
+    strategy_class = None
+    for name, obj in strategy_module.__dict__.items():
+        if isinstance(obj, type) and issubclass(obj, Strategy) and obj is not Strategy:
+            strategy_class = obj
+            break
+            
+    if not strategy_class:
+        print("Error: No Strategy class found in the file.")
+        return
+
+    print(f"Found strategy class: {strategy_class.__name__}")
+
+    # 2. Fetch Data (You can customize this!)
+    ticker = "GOOGL"
+    print(f"Fetching data for {ticker}...")
+    data = yf.download(ticker, period="1y", interval="1d", progress=False, auto_adjust=True)
+    
+    # Clean data for backtesting.py
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+    data.columns = [str(col).capitalize() for col in data.columns]
+
+    # 3. Run Backtest
+    bt = Backtest(data, strategy_class, cash=10000, commission=.002)
+    stats = bt.run()
+    
+    # 4. Print Results (Customize output format here!)
+    print("\\n--- Custom Backtest Results ---")
+    print(stats)
+    # bt.plot() # Uncomment to open plot in browser
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python custom_backtest.py <strategy_filename>")
+    else:
+        run_custom_backtest(sys.argv[1])
+`;
+				await vscode.workspace.fs.writeFile(filePath, new TextEncoder().encode(template));
+			}
+
+			// Open the file
+			const document = await vscode.workspace.openTextDocument(filePath);
+			await vscode.window.showTextDocument(document);
+
+		} catch (error: any) {
+			vscode.window.showErrorMessage(`Wick: Failed to open custom backtest - ${error.message}`);
+		}
+	}
+
+	private async runCustomBacktest(fileName: string): Promise<void> {
+		try {
+			const strategiesDir = await this.getStrategiesDirectory();
+			const customRunnerPath = vscode.Uri.joinPath(strategiesDir, 'custom_backtest.py');
+			const strategyPath = vscode.Uri.joinPath(strategiesDir, fileName);
+
+			// Ensure custom runner exists
+			try {
+				await vscode.workspace.fs.stat(customRunnerPath);
+			} catch {
+				vscode.window.showErrorMessage('Custom backtest runner not found. Please click "Custom Backtest" tab first.');
+				return;
+			}
+
+			// Create or show terminal
+			let terminal = vscode.window.terminals.find(t => t.name === 'Wick Backtest');
+			if (!terminal) {
+				terminal = vscode.window.createTerminal('Wick Backtest');
+			}
+			terminal.show();
+
+			// Run the command
+			// We assume python is in path or use the one from venv if possible, 
+			// but for simplicity let's try to use the configured python or just 'python'
+			const config = vscode.workspace.getConfiguration('wick');
+			// We can try to use the venv python if we know where it is, similar to runBacktest
+			// For now, let's just use the python command and assume user has env setup or we activate it
+
+			// Construct command: python custom_backtest.py strategy.py
+			// We need to be in the strategies dir for imports to work easily or pass full paths
+			const cmd = `cd "${strategiesDir.fsPath}" && python custom_backtest.py "${fileName}"`;
+			terminal.sendText(cmd);
+
+		} catch (error: any) {
+			vscode.window.showErrorMessage(`Wick: Failed to run custom backtest - ${error.message}`);
+		}
+	}
+
+	private async openStrategyFile(fileName: string): Promise<void> {
+		try {
+			const strategiesDir = await this.getStrategiesDirectory();
+			const filePath = vscode.Uri.joinPath(strategiesDir, fileName);
+
+			// Check if file exists
+			try {
+				await vscode.workspace.fs.stat(filePath);
+			} catch {
+				vscode.window.showErrorMessage(`Wick: File "${fileName}" not found`);
+				return;
+			}
+
+			// Open the file in the editor
+			const document = await vscode.workspace.openTextDocument(filePath);
+			await vscode.window.showTextDocument(document);
+		} catch (error: any) {
+			console.error('Failed to open strategy file:', error);
+			vscode.window.showErrorMessage(`Wick: Failed to open file - ${error.message}`);
 		}
 	}
 
@@ -401,6 +557,30 @@ export function activate(context: vscode.ExtensionContext) {
 								});
 							}
 							break;
+						case 'requestSaveStrategy':
+							const filename = await vscode.window.showInputBox({
+								prompt: 'Enter strategy file name',
+								placeHolder: 'my_strategy.py',
+								value: 'my_strategy.py',
+								validateInput: (value) => {
+									if (!value || !value.trim()) {
+										return 'Filename cannot be empty';
+									}
+									return null;
+								}
+							});
+
+							if (filename) {
+								// Ensure .py extension
+								const finalFilename = filename.endsWith('.py') ? filename : filename + '.py';
+								try {
+									await saveStrategyFile(finalFilename, message.code);
+									vscode.window.showInformationMessage(`Strategy saved: ${finalFilename}`);
+								} catch (error: any) {
+									vscode.window.showErrorMessage(`Failed to save strategy: ${error.message}`);
+								}
+							}
+							break;
 					}
 				},
 				undefined,
@@ -431,6 +611,38 @@ async function getStrategyBuilderContent(extensionUri: vscode.Uri): Promise<stri
 	const uri = vscode.Uri.joinPath(extensionUri, 'dist', 'views', 'strategy-builder.html');
 	const uint8Array = await vscode.workspace.fs.readFile(uri);
 	return new TextDecoder().decode(uint8Array);
+}
+
+async function saveStrategyFile(filename: string, code: string): Promise<void> {
+	// Get strategies directory
+	const config = vscode.workspace.getConfiguration('wick');
+	let dirPath = config.get<string>('strategiesDirectory', '~/source/repos/strategies');
+
+	// Expand tilde to home directory
+	if (dirPath.startsWith('~/')) {
+		const homeDir = process.env.HOME || process.env.USERPROFILE;
+		if (homeDir) {
+			dirPath = dirPath.replace('~', homeDir);
+		}
+	}
+
+	const strategiesDir = vscode.Uri.file(dirPath);
+
+	// Ensure directory exists
+	try {
+		await vscode.workspace.fs.createDirectory(strategiesDir);
+	} catch (error) {
+		// Directory might already exist
+	}
+
+	// Create file path
+	const filePath = vscode.Uri.joinPath(strategiesDir, filename);
+
+	// Write the file
+	const content = new TextEncoder().encode(code);
+	await vscode.workspace.fs.writeFile(filePath, content);
+
+	console.log(`Saved strategy to: ${filePath.fsPath}`);
 }
 
 

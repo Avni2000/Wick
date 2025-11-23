@@ -48,21 +48,9 @@
         .sidebar {
             background: var(--vscode-sideBar-background, #1e1e1e);
             height: 100vh;
-            overflow: auto;
+            overflow-y: auto;
+            overflow-x: hidden;
             border-right: 1px solid var(--vscode-sideBar-border, rgba(255, 255, 255, 0.06));
-
-            /* Scroll shadows (pure CSS, no JS) */
-            /* Fades top/bottom edges to hint scrollability */
-            -webkit-mask-image: linear-gradient(to bottom,
-                    transparent,
-                    black var(--shadow-size),
-                    black calc(100% - var(--shadow-size)),
-                    transparent);
-            mask-image: linear-gradient(to bottom,
-                    transparent,
-                    black var(--shadow-size),
-                    black calc(100% - var(--shadow-size)),
-                    transparent);
         }
 
         /* View tabs (like VS Code view switchers) */
@@ -234,25 +222,21 @@
         <!-- Tabs -->
         <button class="tab-item active" role="tab" aria-selected="true" data-tab="chart">Chart</button>
         <button class="tab-item" role="tab" aria-selected="false" data-tab="strategy-builder">Strategy Builder</button>
-        <button class="tab-item" role="tab" aria-selected="false" data-tab="backtesting">Backtesting</button>
+        <button class="tab-item" role="tab" aria-selected="false" data-tab="custom-backtest">Custom Backtest</button>
 
         <!-- Files/Sections -->
         <div class="files" role="tree">
-            <!-- Sample strategies -->
-            <div class="folder" id="sample-strategies" role="treeitem" aria-expanded="true">
-                <div class="folder-header" tabindex="0" aria-controls="sample-strategies-content"
-                    onclick="toggleFolder('sample-strategies', event)">
-                    <!-- Codicon chevron with text fallback via aria-label -->
+            <!-- Backtest Config -->
+            <div class="folder" id="config" role="treeitem" aria-expanded="true">
+                <div class="folder-header" tabindex="0" aria-controls="config-content"
+                    onclick="toggleFolder('config', event)">
                     <span class="chevron" aria-hidden="true">
                         <span class="codicon codicon-chevron-down"></span>
                     </span>
-                    <span class="folder-name">sample strategies</span>
+                    <span class="folder-name">Backtest</span>
                 </div>
-                <div class="folder-content" id="sample-strategies-content" role="group">
-                    <div class="file-item" role="treeitem" tabindex="0">moving_average.py</div>
-                    <div class="file-item" role="treeitem" tabindex="0">rsi_strategy.py</div>
-                    <div class="file-item" role="treeitem" tabindex="0">bollinger_bands.py</div>
-                    <div class="file-item" role="treeitem" tabindex="0">macd_crossover.py</div>
+                <div class="folder-content" id="config-content" role="group">
+                    <!-- custom_backtest.py will go here -->
                 </div>
             </div>
 
@@ -302,6 +286,8 @@
                 vscode.postMessage({ command: 'showChart' });
             } else if (tabName === 'strategy-builder') {
                 vscode.postMessage({ command: 'showStrategyBuilder' });
+            } else if (tabName === 'custom-backtest') {
+                vscode.postMessage({ command: 'openCustomBacktest' });
             }
         }
 
@@ -335,19 +321,34 @@
             });
         });
 
-        // File selection styling
+        // File selection styling and opening
         document.addEventListener('click', (e) => {
             const row = e.target.closest('.file-item');
             if (!row) return;
+            // If clicking the run button, don't select the row
+            if (e.target.closest('.run-btn')) return;
+
             e.stopPropagation();
             document.querySelectorAll('.file-item.selected').forEach(n => n.classList.remove('selected'));
             row.classList.add('selected');
+
+            // Open file in VS Code editor if it's a .py file
+            const fileName = row.querySelector('.file-name').textContent.trim();
+            if (fileName.endsWith('.py') && fileName !== 'No strategy files') {
+                vscode.postMessage({ command: 'openFile', fileName: fileName });
+            }
         });
 
         // Add file - send message to extension to show native input box
         function addFile(event) {
             event.stopPropagation();
             vscode.postMessage({ command: 'requestAddStrategy' });
+        }
+
+        // Run custom backtest
+        function runCustomBacktest(event, fileName) {
+            event.stopPropagation();
+            vscode.postMessage({ command: 'runCustomBacktest', fileName: fileName });
         }
 
         // Listen for messages from the extension
@@ -362,33 +363,86 @@
 
         // Update the file list in the Strategies folder
         function updateFileList(files) {
-            const content = document.getElementById('strategies-content');
-            if (!content) return;
+            const strategiesContent = document.getElementById('strategies-content');
+            const configContent = document.getElementById('config-content');
+
+            if (!strategiesContent || !configContent) return;
 
             // Clear existing files
-            content.innerHTML = '';
+            strategiesContent.innerHTML = '';
+            configContent.innerHTML = '';
 
-            // Add each file
-            if (files && files.length > 0) {
-                files.forEach(fileName => {
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'file-item';
-                    fileItem.setAttribute('role', 'treeitem');
-                    fileItem.setAttribute('tabindex', '0');
-                    fileItem.textContent = fileName;
-                    content.appendChild(fileItem);
+            if (!files || files.length === 0) {
+                showPlaceholder(strategiesContent, 'No strategy files');
+                showPlaceholder(configContent, 'No config files');
+                return;
+            }
+
+            // Separate files
+            const configFiles = files.filter(f => f === 'custom_backtest.py');
+            const strategyFiles = files.filter(f => f !== 'custom_backtest.py');
+
+            // Render Config Files
+            if (configFiles.length > 0) {
+                configFiles.forEach(fileName => {
+                    const fileItem = createFileItem(fileName, false); // No run button for config
+                    configContent.appendChild(fileItem);
                 });
             } else {
-                // Show a placeholder if no files exist
-                const placeholder = document.createElement('div');
-                placeholder.className = 'file-item';
-                placeholder.style.fontStyle = 'italic';
-                placeholder.style.opacity = '0.6';
-                placeholder.textContent = 'No strategy files';
-                content.appendChild(placeholder);
+                showPlaceholder(configContent, 'No config files');
             }
+
+            // Render Strategy Files
+            if (strategyFiles.length > 0) {
+                strategyFiles.forEach(fileName => {
+                    const fileItem = createFileItem(fileName, true); // Add run button
+                    strategiesContent.appendChild(fileItem);
+                });
+            } else {
+                showPlaceholder(strategiesContent, 'No strategy files');
+            }
+        }
+
+        function createFileItem(fileName, hasRunButton) {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.setAttribute('role', 'treeitem');
+            fileItem.setAttribute('tabindex', '0');
+
+            // File name span
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'file-name';
+            nameSpan.textContent = fileName;
+            nameSpan.style.flex = '1';
+            nameSpan.style.overflow = 'hidden';
+            nameSpan.style.textOverflow = 'ellipsis';
+            nameSpan.style.whiteSpace = 'nowrap';
+
+            fileItem.appendChild(nameSpan);
+
+            // Run button (only for strategies)
+            if (hasRunButton) {
+                const runBtn = document.createElement('button');
+                runBtn.className = 'add-button run-btn';
+                runBtn.title = 'Run Custom Backtest';
+                runBtn.innerHTML = '<span class="codicon codicon-play"></span>';
+                runBtn.onclick = (e) => runCustomBacktest(e, fileName);
+                fileItem.appendChild(runBtn);
+            }
+
+            return fileItem;
+        }
+
+        function showPlaceholder(container, text) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'file-item';
+            placeholder.style.fontStyle = 'italic';
+            placeholder.style.opacity = '0.6';
+            placeholder.textContent = text;
+            container.appendChild(placeholder);
         }
     </script>
 </body>
 
 </html>
+```
