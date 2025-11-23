@@ -1,46 +1,57 @@
-# Wick
+# Wick - Project Summary
 
-Algorithmically trade from VS Code with real-time chart visualization.
+Wick is a VS Code extension designed to democratize algorithmic trading by providing a visual, node-based interface for building, backtesting, and deploying trading strategies directly within the editor.
 
-## Features
+## Key Features
 
-- **Interactive Charts**: View and analyze trading data using lightweight-charts
-- **Chart Command**: Open charts directly from the command palette with `Wick: Show Chart`
+### 1. Visual Strategy Builder
+- **Node-Based Interface**: Built with Drawflow, allowing users to drag and drop nodes to create logic flows.
+- **Components**:
+  - **Indicators**: RSI, SMA, EMA, MACD, Bollinger Bands.
+  - **Logic**: AND, OR gates for complex conditions.
+  - **Price Data**: Open, High, Low, Close comparisons.
+  - **Actions**: Buy/Sell triggers.
+- **Code Generation**: Automatically translates the visual flow into valid Python code compatible with the `backtesting.py` framework.
 
-## Usage
+### 2. Integrated Backtesting
+- **Seamless Execution**: Run backtests directly from the builder.
+- **Results View**: View key metrics (Return, Win Rate, Max Drawdown, etc.) immediately after simulation.
+- **Python Backend**: Leverages a local Python environment to execute strategies, ensuring reliability and extensibility.
 
-1. Open the command palette (`Ctrl+Shift+P` or `Cmd+Shift+P`)
-2. Run `Wick: Show Chart` to open an interactive chart view
+### 3. Wick Studio Mode
+- **Zen Mode**: Hides VS Code's standard UI (Activity Bar, Status Bar) to focus entirely on the trading workflow.
+- **Splitscreen Layout**: Intelligent window management keeps the Strategy Builder and Chart visible side-by-side.
+- **Custom Sidebar**: A dedicated "Trading Dashboard" sidebar for managing strategies and settings.
 
-## Requirements
+### 4. Interactive Charting
+- **Lightweight Charts**: High-performance financial charting.
+- **Features**:
+  - Candlestick and Line chart toggles.
+  - Time range selection (1M, 3M, 6M, YTD, 1Y, ALL).
+  - Crosshair and tooltip inspection.
 
-- VS Code 1.106.1 or higher
+## Technical Architecture
 
-## Release Notes
+### Frontend (VS Code Webviews)
+- **Framework-less**: Pure HTML/CSS/JavaScript for maximum performance and control.
+- **Libraries**:
+  - **Drawflow**: For the node editor.
+  - **Lightweight Charts**: For rendering financial data.
+  - **Font Awesome**: For UI icons.
+- **Communication**: Uses the VS Code Webview Message API to communicate with the extension host.
 
-### 0.0.1
+### Backend (Extension Host & Python)
+- **TypeScript**: Core extension logic, managing webviews, file systems, and process execution.
+- **Python**: The `backtesting.py` library is used for the actual strategy simulation. The extension spawns Python processes to run backtests and captures the output.
 
-Initial release of Wick with basic charting functionality.
+## Challenges & Solutions
 
----
+### State Management
+Syncing state between the visual builder (nodes) and the underlying Python code.
 
-## Following extension guidelines
+**Solution**: Real-time code generation and parsing.
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+### Window Management
+Creating a "Studio" feel within VS Code's rigid layout system.
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+**Solution**: Custom commands to toggle UI elements and intelligent editor group management.
