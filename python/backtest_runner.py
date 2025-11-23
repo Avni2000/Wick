@@ -65,7 +65,7 @@ def main():
             sys.exit(1)
         
         # Run backtest with trade finalization enabled
-        bt = Backtest(data, strategy_class, cash=10000, commission=.002, finalize_trades=True)
+        bt = Backtest(data, strategy_class, cash=1000000, commission=.002, finalize_trades=True)
         stats = bt.run()
         
         # Extract equity curve
