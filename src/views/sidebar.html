@@ -214,11 +214,29 @@
                 transition: none;
             }
         }
+
+        /* Tab Content Areas */
+        .tab-content-area {
+            display: none;
+        }
+
+        .tab-content-area.active {
+            display: block;
+        }
     </style>
 </head>
 
 <body>
     <aside class="sidebar" role="navigation" aria-label="Wick Trading Sidebar">
+        <!-- Header with Settings -->
+        <div
+            style="display: flex; align-items: center; justify-content: space-between; padding: 10px var(--pad-x); border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, rgba(255, 255, 255, 0.06)); margin-bottom: 10px;">
+            <span style="font-weight: 600; font-size: 11px; text-transform: uppercase;">Wick Trading</span>
+            <button class="add-button" title="Open Settings" onclick="openSettings()" style="opacity: 1;">
+                <span class="codicon codicon-settings-gear"></span>
+            </button>
+        </div>
+
         <!-- Tabs -->
         <button class="tab-item active" role="tab" aria-selected="true" data-tab="chart">Chart</button>
         <button class="tab-item" role="tab" aria-selected="false" data-tab="strategy-builder">Strategy Builder</button>
@@ -226,36 +244,47 @@
 
         <!-- Files/Sections -->
         <div class="files" role="tree">
-            <!-- Backtest Config -->
-            <div class="folder" id="config" role="treeitem" aria-expanded="true">
-                <div class="folder-header" tabindex="0" aria-controls="config-content"
-                    onclick="toggleFolder('config', event)">
-                    <span class="chevron" aria-hidden="true">
-                        <span class="codicon codicon-chevron-down"></span>
-                    </span>
-                    <span class="folder-name">Backtest</span>
-                </div>
-                <div class="folder-content" id="config-content" role="group">
-                    <!-- custom_backtest.py will go here -->
+            <!-- Chart Content (Initially Active) -->
+            <div id="chart-content" class="tab-content-area active">
+                <!-- Chart specific sidebar content can go here if needed -->
+            </div>
+
+            <!-- Custom Backtest Content -->
+            <div id="custom-backtest-content" class="tab-content-area">
+                <!-- Backtest Config -->
+                <div class="folder" id="config" role="treeitem" aria-expanded="true">
+                    <div class="folder-header" tabindex="0" aria-controls="config-content"
+                        onclick="toggleFolder('config', event)">
+                        <span class="chevron" aria-hidden="true">
+                            <span class="codicon codicon-chevron-down"></span>
+                        </span>
+                        <span class="folder-name">Backtest</span>
+                    </div>
+                    <div class="folder-content" id="config-content" role="group">
+                        <!-- custom_backtest.py will go here -->
+                    </div>
                 </div>
             </div>
 
-            <!-- User strategies -->
-            <div class="folder" id="strategies" role="treeitem" aria-expanded="true">
-                <div class="folder-header" tabindex="0" aria-controls="strategies-content"
-                    onclick="toggleFolder('strategies', event)">
-                    <span class="chevron" aria-hidden="true">
-                        <span class="codicon codicon-chevron-down"></span>
-                    </span>
-                    <span class="folder-name">Strategies</span>
-                    <!-- Add button using Codicons -->
-                    <button class="add-button" title="Add file" aria-label="Add file" onclick="addFile(event)">
-                        <span class="codicon codicon-add"></span>
-                    </button>
-                </div>
-                <div class="folder-content" id="strategies-content" role="group">
-                    <!-- Dynamically added items would go here in your app -->
-                    <div class="file-item" role="treeitem" tabindex="0">my_strategy.py</div>
+            <!-- Strategy Builder Content -->
+            <div id="strategy-builder-content" class="tab-content-area">
+                <!-- User strategies -->
+                <div class="folder" id="strategies" role="treeitem" aria-expanded="true">
+                    <div class="folder-header" tabindex="0" aria-controls="strategies-content"
+                        onclick="toggleFolder('strategies', event)">
+                        <span class="chevron" aria-hidden="true">
+                            <span class="codicon codicon-chevron-down"></span>
+                        </span>
+                        <span class="folder-name">Strategies</span>
+                        <!-- Add button using Codicons -->
+                        <button class="add-button" title="Add file" aria-label="Add file" onclick="addFile(event)">
+                            <span class="codicon codicon-add"></span>
+                        </button>
+                    </div>
+                    <div class="folder-content" id="strategies-content" role="group">
+                        <!-- Dynamically added items would go here in your app -->
+                        <div class="file-item" role="treeitem" tabindex="0">my_strategy.py</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -351,12 +380,23 @@
             vscode.postMessage({ command: 'runCustomBacktest', fileName: fileName });
         }
 
+        // Open Settings
+        function openSettings() {
+            vscode.postMessage({ command: 'openSettings' });
+        }
+
         // Listen for messages from the extension
         window.addEventListener('message', event => {
             const message = event.data;
             switch (message.type) {
                 case 'fileList':
                     updateFileList(message.files);
+                    break;
+                case 'setActiveTab':
+                    const tab = document.querySelector(`.tab-item[data-tab="${message.tab}"]`);
+                    if (tab) {
+                        setActiveTab(tab);
+                    }
                     break;
             }
         });

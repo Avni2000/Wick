@@ -149,6 +149,8 @@
         <button class="range-btn" data-range="1y">1Y</button>
         <button class="range-btn active" data-range="5y">5Y</button>
         <button class="range-btn" data-range="max">MAX</button>
+        <div style="width: 1px; height: 20px; background: #3e3e42; margin: 0 4px;"></div>
+        <button class="range-btn" id="toggleTypeBtn">Line</button>
     </div>
 
     <script>
@@ -185,13 +187,53 @@
                 chart.applyOptions({ width: cr.width, height: cr.height });
             }).observe(container);
 
-            // v5 API: use addSeries with CandlestickSeries
-            const candles = chart.addSeries(LWC.CandlestickSeries, {
-                upColor: '#26a69a',
-                downColor: '#ef5350',
-                wickUpColor: '#26a69a',
-                wickDownColor: '#ef5350',
-                borderVisible: false,
+            // Chart Type State
+            let mainSeries = null;
+            let currentChartType = 'candlestick'; // 'candlestick' or 'line'
+            let currentData = [];
+
+            function createSeries() {
+                if (mainSeries) {
+                    chart.removeSeries(mainSeries);
+                }
+
+                if (currentChartType === 'candlestick') {
+                    mainSeries = chart.addSeries(LWC.CandlestickSeries, {
+                        upColor: '#26a69a',
+                        downColor: '#ef5350',
+                        wickUpColor: '#26a69a',
+                        wickDownColor: '#ef5350',
+                        borderVisible: false,
+                    });
+                    if (currentData.length > 0) {
+                        mainSeries.setData(currentData);
+                    }
+                } else {
+                    mainSeries = chart.addSeries(LWC.LineSeries, {
+                        color: '#26a69a',
+                        lineWidth: 2,
+                    });
+                    if (currentData.length > 0) {
+                        const lineData = currentData.map(d => ({ time: d.time, value: d.close }));
+                        mainSeries.setData(lineData);
+                    }
+                }
+            }
+
+            // Initial Series
+            createSeries();
+
+            // Toggle Button Logic
+            const toggleTypeBtn = document.getElementById('toggleTypeBtn');
+            toggleTypeBtn.addEventListener('click', () => {
+                if (currentChartType === 'candlestick') {
+                    currentChartType = 'line';
+                    toggleTypeBtn.textContent = 'Candles';
+                } else {
+                    currentChartType = 'candlestick';
+                    toggleTypeBtn.textContent = 'Line';
+                }
+                createSeries();
             });
 
             tickerEl.textContent = TICKER.toUpperCase();
@@ -244,7 +286,7 @@
             });
 
             // Setup range selector buttons
-            const rangeButtons = document.querySelectorAll('.range-btn');
+            const rangeButtons = document.querySelectorAll('.range-btn[data-range]');
             rangeButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
                     // Update active state
@@ -276,7 +318,12 @@
                         }
 
                         // Update chart data
-                        candles.setData(data);
+                        currentData = data;
+                        if (currentChartType === 'candlestick') {
+                            mainSeries.setData(currentData);
+                        } else {
+                            mainSeries.setData(currentData.map(d => ({ time: d.time, value: d.close })));
+                        }
                         chart.timeScale().fitContent();
 
                         // Update price display

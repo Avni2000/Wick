@@ -4,6 +4,7 @@ import { spawn, exec } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
+
 console.log('Wick extension file is being loaded!');
 
 // Types for candle data
@@ -401,7 +402,7 @@ if __name__ == "__main__":
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
@@ -417,6 +418,12 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		})
 	);
+
+	// Register the launcher view (empty tree view to show welcome content)
+	vscode.window.registerTreeDataProvider('wick-launcher', {
+		getChildren: () => [],
+		getTreeItem: (element: any) => element
+	});
 	console.log('Webview view provider registered successfully');
 
 	// The command has been defined in the package.json file
@@ -437,11 +444,14 @@ export function activate(context: vscode.ExtensionContext) {
 		chartPanel = vscode.window.createWebviewPanel(
 			'wickChart', // Identifies the type of the webview. Used internally
 			'Wick Chart', // Title of the panel displayed to the user
-			vscode.ViewColumn.One, // Editor column to show the new webview panel in.
+			vscode.ViewColumn.Beside, // Open beside the current editor
 			{
 				enableScripts: true // Enable scripts in the webview
 			}
 		);
+
+		// Move the chart to the bottom
+		await vscode.commands.executeCommand('workbench.action.moveEditorToBelowGroup');
 
 		// Handle panel disposal
 		chartPanel.onDidDispose(() => {
@@ -595,7 +605,122 @@ export function activate(context: vscode.ExtensionContext) {
 		})
 	);
 
+	context.subscriptions.push(
+		vscode.commands.registerCommand('wick.openStudioNewWindow', () => openStudio(context, true))
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('wick.openStudioCurrentWindow', () => openStudio(context, false))
+	);
+
+	// Keep the original command for backward compatibility / palette use (defaults to current window for safety)
+	context.subscriptions.push(
+		vscode.commands.registerCommand('wick.openStudio', () => openStudio(context, false))
+	);
+
+	// Check if we should start in Studio mode (only if we are in the Studio Window)
+	const config = vscode.workspace.getConfiguration('wick');
+	if (config.get<boolean>('isStudioWindow', false) && config.get<boolean>('startInStudioMode', true)) {
+		// Ensure sidebar is visible
+		vscode.commands.executeCommand('workbench.view.extension.wick');
+
+		// Open Strategy Builder first (Top/Main)
+		await vscode.commands.executeCommand('wick.showStrategyBuilder');
+
+		// Open Chart (will open beside and move below)
+		await vscode.commands.executeCommand('wick.showChart');
+
+		// Highlight the Chart tab in the sidebar
+		// We need to wait a bit for the sidebar to be ready to receive messages
+		setTimeout(() => {
+			if (provider['_view']) {
+				provider['_view'].webview.postMessage({
+					type: 'setActiveTab',
+					tab: 'chart'
+				});
+			}
+		}, 1000);
+	}
+
 	context.subscriptions.push(disposable);
+}
+
+async function openStudio(context: vscode.ExtensionContext, newWindow: boolean) {
+	// Check if we are already in the Studio Workspace
+	const config = vscode.workspace.getConfiguration('wick');
+	const isStudio = config.get<boolean>('isStudioWindow', false);
+
+	if (isStudio) {
+		// We are already in the studio, just ensure the sidebar is visible
+		vscode.commands.executeCommand('workbench.view.extension.wick');
+		return;
+	}
+
+	// Otherwise, we need to open the Studio Window
+	const strategiesDir = await getStrategiesDirectory();
+	const workspaceFile = vscode.Uri.joinPath(strategiesDir, 'wick.code-workspace');
+
+	// Create the workspace file content
+	const workspaceContent = {
+		folders: [
+			{
+				path: "."
+			}
+		],
+		settings: {
+			"workbench.colorTheme": "Default Dark Modern",
+			"workbench.iconTheme": "material-icon-theme",
+			"workbench.startupEditor": "none",
+			"workbench.sideBar.location": "left",
+			"workbench.statusBar.visible": false,
+			"workbench.activityBar.location": "hidden",
+			"workbench.editor.showTabs": "multiple",
+			"breadcrumbs.enabled": false,
+			"editor.minimap.enabled": false,
+			"workbench.layoutControl.enabled": false,
+			"window.commandCenter": false,
+			"window.menuBarVisibility": "compact",
+			"wick.isStudioWindow": true,
+			"wick.startInStudioMode": true
+		}
+	};
+
+	// Write the file
+	await vscode.workspace.fs.writeFile(
+		workspaceFile,
+		new TextEncoder().encode(JSON.stringify(workspaceContent, null, 4))
+	);
+
+	// Open the workspace
+	await vscode.commands.executeCommand(
+		'vscode.openFolder',
+		workspaceFile,
+		newWindow // forceNewWindow
+	);
+}
+
+async function getStrategiesDirectory(): Promise<vscode.Uri> {
+	const config = vscode.workspace.getConfiguration('wick');
+	let dirPath = config.get<string>('strategiesDirectory', '~/source/repos/strategies');
+
+	// Expand tilde to home directory
+	if (dirPath.startsWith('~/')) {
+		const homeDir = process.env.HOME || process.env.USERPROFILE;
+		if (homeDir) {
+			dirPath = dirPath.replace('~', homeDir);
+		}
+	}
+
+	const uri = vscode.Uri.file(dirPath);
+
+	// Ensure it exists
+	try {
+		await vscode.workspace.fs.createDirectory(uri);
+	} catch (e) {
+		// ignore
+	}
+
+	return uri;
 }
 
 async function getWebviewContent(ticker: string, extensionUri: vscode.Uri): Promise<string> {
@@ -647,7 +772,7 @@ async function saveStrategyFile(filename: string, code: string): Promise<void> {
 
 
 
-async function runBacktest(config: any, extensionUri: vscode.Uri): Promise<any> {
+export async function runBacktest(config: any, extensionUri: vscode.Uri): Promise<any> {
 	return new Promise(async (resolve, reject) => {
 		try {
 			// Ensure Python environment is set up
@@ -720,7 +845,7 @@ async function runBacktest(config: any, extensionUri: vscode.Uri): Promise<any> 
 	});
 }
 
-async function ensurePythonEnvironment(): Promise<string> {
+export async function ensurePythonEnvironment(): Promise<string> {
 	const config = vscode.workspace.getConfiguration('wick');
 	let strategiesDir = config.get<string>('strategiesDirectory', '~/source/repos/strategies');
 
