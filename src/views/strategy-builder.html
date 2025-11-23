@@ -677,6 +677,7 @@
 
     <script>
         const vscode = acquireVsCodeApi();
+        let lastBacktestResults = null;
         var id = document.getElementById("drawflow");
         const editor = new Drawflow(id);
         editor.reroute = true;
@@ -866,16 +867,16 @@
                     editor.addNode('or', 1, 1, pos_x, pos_y, 'or', {}, html_or);
                     break;
                 case 'price':
-                    editor.addNode('price', 0, 1, pos_x, pos_y, 'price', { source: 'Close', op: '>', value: 100 }, html_price);
+                    editor.addNode('price', 1, 1, pos_x, pos_y, 'price', { source: 'Close', op: '>', value: 100 }, html_price);
                     break;
                 case 'rsi':
-                    editor.addNode('rsi', 0, 1, pos_x, pos_y, 'rsi', { period: 14, op: '>', value: 30 }, html_rsi);
+                    editor.addNode('rsi', 1, 1, pos_x, pos_y, 'rsi', { period: 14, op: '>', value: 30 }, html_rsi);
                     break;
                 case 'sma':
-                    editor.addNode('sma', 0, 1, pos_x, pos_y, 'sma', { period: 20, op: '>', value: 100 }, html_sma);
+                    editor.addNode('sma', 1, 1, pos_x, pos_y, 'sma', { period: 20, op: '>', value: 100 }, html_sma);
                     break;
                 case 'ema':
-                    editor.addNode('ema', 0, 1, pos_x, pos_y, 'ema', { period: 20, op: '>', value: 100 }, html_ema);
+                    editor.addNode('ema', 1, 1, pos_x, pos_y, 'ema', { period: 20, op: '>', value: 100 }, html_ema);
                     break;
                 case 'macd':
                     editor.addNode('macd', 0, 1, pos_x, pos_y, 'macd', { fast: 12, slow: 26, signal: 9, op: '>' }, html_macd);
@@ -953,13 +954,33 @@
                 if (!val) return null;
 
                 const d = node.data;
+
+                // Check for dynamic right-hand side (connected input)
+                let rhs = d.value;
+                if (node.inputs.input_1 && node.inputs.input_1.connections.length > 0) {
+                    const connectedNodeId = node.inputs.input_1.connections[0].node;
+                    const connectedNode = nodes[connectedNodeId];
+                    const connectedVal = registerIndicator(connectedNode);
+
+                    if (connectedVal) {
+                        // Handle object returns (MACD, BB) - for now just take the main value if possible, or fail gracefully
+                        if (typeof connectedVal === 'object') {
+                            if (connectedVal.macd) rhs = connectedVal.macd;
+                            else if (connectedVal.middle) rhs = connectedVal.middle;
+                            // else keep default static value if we can't resolve a single number
+                        } else {
+                            rhs = connectedVal;
+                        }
+                    }
+                }
+
                 if (node.name === 'macd') {
                     return `${val.macd} ${d.op} ${val.signal}`;
                 } else if (node.name === 'bb') {
                     return `self.data.Close[-1] ${d.op} ${val[d.band]}`;
                 } else {
                     // RSI, SMA, EMA, Price
-                    return `${val} ${d.op} ${d.value}`;
+                    return `${val} ${d.op} ${rhs}`;
                 }
             }
 
@@ -1012,8 +1033,50 @@ class FlowStrategy(Strategy):
         editor.on('nodeCreated', generateCode);
         editor.on('nodeRemoved', generateCode);
         editor.on('nodeMoved', generateCode);
-        editor.on('connectionCreated', generateCode);
-        editor.on('connectionRemoved', generateCode);
+        editor.on('connectionCreated', (info) => {
+            generateCode();
+            updateNodeInputVisibility(info.input_id);
+        });
+        editor.on('connectionRemoved', (info) => {
+            generateCode();
+            updateNodeInputVisibility(info.input_id);
+        });
+
+        function updateNodeInputVisibility(nodeId) {
+            const node = editor.getNodeFromId(nodeId);
+            if (!node) return;
+
+            // Only for indicator nodes that have a value input
+            if (['rsi', 'sma', 'ema', 'price'].includes(node.name)) {
+                const nodeEl = document.getElementById(`node-${nodeId}`);
+                if (!nodeEl) return;
+
+                const valueInput = nodeEl.querySelector('input[df-value]');
+                if (!valueInput) return;
+
+                // Check if input_1 has connections
+                const hasConnection = node.inputs.input_1 && node.inputs.input_1.connections.length > 0;
+
+                if (hasConnection) {
+                    valueInput.style.display = 'none';
+                    // Check if we already have a label
+                    let label = nodeEl.querySelector('.connected-label');
+                    if (!label) {
+                        label = document.createElement('span');
+                        label.className = 'connected-label';
+                        label.style.fontSize = '10px';
+                        label.style.color = 'var(--accent-color)';
+                        label.style.marginLeft = '4px';
+                        label.innerText = '(Connected)';
+                        valueInput.parentNode.appendChild(label);
+                    }
+                } else {
+                    valueInput.style.display = '';
+                    const label = nodeEl.querySelector('.connected-label');
+                    if (label) label.remove();
+                }
+            }
+        }
 
         // Helper function to toggle size input visibility
         window.toggleActionSize = function (selectEl) {
@@ -1176,7 +1239,7 @@ class FlowStrategy(Strategy):
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
 
-            const context = `I am working on a trading strategy using a node-based editor.
+            let context = `I am working on a trading strategy using a node-based editor.
 Here is the configuration:
 - Ticker: ${ticker}
 - Start Date: ${startDate}
@@ -1190,9 +1253,16 @@ ${code || '# No valid code generated yet'}
 Here is the underlying node configuration (JSON):
 \`\`\`json
 ${JSON.stringify(nodeData, null, 2)}
-\`\`\`
+\`\`\``;
 
-Please help me with understanding why this backtest isn't profitable and what settings I can change?`;
+            if (lastBacktestResults) {
+                context += `\n\nHere are the results of the most recent backtest:
+\`\`\`json
+${JSON.stringify(lastBacktestResults, null, 2)}
+\`\`\``;
+            }
+
+            context += `\n\nPlease help me with understanding why this backtest isn't profitable and what settings I can change?`;
 
             vscode.postMessage({
                 command: 'copyToClipboard',
@@ -1210,8 +1280,8 @@ Please help me with understanding why this backtest isn't profitable and what se
 
             // Add nodes centered in the view
             // We assume a standard viewport and place nodes to be visible
-            const rsi = editor.addNode('rsi', 0, 1, 100, 150, 'rsi', { period: 14, op: '>', value: 30 }, html_rsi);
-            const sma = editor.addNode('sma', 0, 1, 100, 350, 'sma', { period: 20, op: '>', value: 100 }, html_sma);
+            const rsi = editor.addNode('rsi', 1, 1, 100, 150, 'rsi', { period: 14, op: '>', value: 30 }, html_rsi);
+            const sma = editor.addNode('sma', 1, 1, 100, 350, 'sma', { period: 20, op: '>', value: 100 }, html_sma);
             const and = editor.addNode('and', 1, 1, 400, 250, 'and', {}, html_and);
             const action = editor.addNode('action', 1, 0, 700, 250, 'action', { action: 'buy_all', size: 100 }, html_action);
 
@@ -1231,6 +1301,7 @@ Please help me with understanding why this backtest isn't profitable and what se
             const message = event.data;
             switch (message.type) {
                 case 'backtestResults':
+                    lastBacktestResults = message.results;
                     displayResults(message.results);
                     break;
                 case 'backtestError':

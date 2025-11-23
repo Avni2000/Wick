@@ -11,7 +11,7 @@ node_modules/
 .vscode-test/
 
 # Compiled extension packages
-*.vsix
+# *.vsix
 
 # Log files
 *.log
