@@ -1,0 +1,9 @@
+{
+    "deployment_id": 1,
+    "strategy_name": "RSI Mean Reversion Strategy",
+    "ticker": "AAPL",
+    "mode": "paper",
+    "position_size": 100,
+    "order_type": "MARKET",
+    "strategy_code": "from backtesting import Strategy\nimport pandas as pd\n\nclass RSIStrategy(Strategy):\n    \"\"\"Simple RSI mean reversion strategy\"\"\"\n    \n    # Strategy parameters\n    rsi_period = 14\n    rsi_lower = 30\n    rsi_upper = 70\n    \n    def init(self):\n        \"\"\"Initialize indicators\"\"\"\n        # Calculate RSI using pandas\n        close = pd.Series(self.data.Close, index=self.data.index)\n        delta = close.diff()\n        gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()\n        loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()\n        rs = gain / loss\n        self.rsi = self.I(lambda: 100 - (100 / (1 + rs)), name='RSI')\n    \n    def next(self):\n        \"\"\"Execute on each bar\"\"\"\n        # Get current RSI value\n        current_rsi = self.rsi[-1]\n        \n        # Trading logic\n        if current_rsi < self.rsi_lower:\n            # Oversold - buy signal\n            if not self.position:\n                self.buy()\n        \n        elif current_rsi > self.rsi_upper:\n            # Overbought - sell signal\n            if self.position:\n                self.position.close()\n"
+}

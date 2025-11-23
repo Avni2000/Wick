@@ -74,6 +74,9 @@ class WickViewProvider implements vscode.WebviewViewProvider {
 				case 'runCustomBacktest':
 					await this.runCustomBacktest(message.fileName);
 					break;
+				case 'deployLiveFromFile':
+					await this.deployLiveFromFile(message.fileName);
+					break;
 			}
 		});
 	}
@@ -337,7 +340,6 @@ if __name__ == "__main__":
 			// but for simplicity let's try to use the configured python or just 'python'
 			const config = vscode.workspace.getConfiguration('wick');
 			// We can try to use the venv python if we know where it is, similar to runBacktest
-			// For now, let's just use the python command and assume user has env setup or we activate it
 
 			// Construct command: python custom_backtest.py strategy.py
 			// We need to be in the strategies dir for imports to work easily or pass full paths
@@ -346,6 +348,68 @@ if __name__ == "__main__":
 
 		} catch (error: any) {
 			vscode.window.showErrorMessage(`Wick: Failed to run custom backtest - ${error.message}`);
+		}
+	}
+
+	private async deployLiveFromFile(fileName: string): Promise<void> {
+		try {
+			const strategiesDir = await this.getStrategiesDirectory();
+			const strategyPath = vscode.Uri.joinPath(strategiesDir, fileName);
+
+			// Check if file exists
+			try {
+				await vscode.workspace.fs.stat(strategyPath);
+			} catch {
+				vscode.window.showErrorMessage(`Wick: File "${fileName}" not found`);
+				return;
+			}
+
+			// Read the strategy file
+			const fileContent = await vscode.workspace.fs.readFile(strategyPath);
+			const strategyCode = new TextDecoder().decode(fileContent);
+
+			// Prompt for ticker
+			const ticker = await vscode.window.showInputBox({
+				prompt: 'Enter ticker symbol to trade',
+				placeHolder: 'AAPL',
+				value: 'AAPL'
+			});
+
+			if (!ticker) return;
+
+			// Create deployment config with file path
+			const deploymentId = Date.now();
+			const deployConfig = {
+				deployment_id: deploymentId,
+				strategy_name: fileName.replace('.py', ''),
+				ticker: ticker,
+				mode: 'paper',
+				position_size: 100,
+				order_type: 'MARKET',
+				strategy_file: strategyPath.fsPath  // Use file path instead of inline code
+			};
+
+			// Save deployment config
+			const deploymentsDir = vscode.Uri.joinPath(strategiesDir, 'deployments');
+			await vscode.workspace.fs.createDirectory(deploymentsDir);
+
+			const configPath = vscode.Uri.joinPath(deploymentsDir, `deployment_${deploymentId}.json`);
+			await vscode.workspace.fs.writeFile(
+				configPath,
+				new TextEncoder().encode(JSON.stringify(deployConfig, null, 2))
+			);
+
+			// Get python path from venv
+			const pythonExecutable = await ensurePythonEnvironment();
+			const liveTraderPath = vscode.Uri.joinPath(this._extensionUri, 'python', 'live_trader.py').fsPath;
+
+			const cmd = `"${pythonExecutable}" "${liveTraderPath}" --config "${configPath.fsPath}" --stream --interval 3`;
+			runInExternalTerminal(cmd);
+
+			vscode.window.showInformationMessage(`Deployed ${fileName} in paper trading mode. Check terminal for live updates.`);
+
+		} catch (error: any) {
+			vscode.window.showErrorMessage(`Wick: Failed to deploy - ${error.message}`);
 		}
 	}
 
@@ -589,6 +653,38 @@ export async function activate(context: vscode.ExtensionContext) {
 								} catch (error: any) {
 									vscode.window.showErrorMessage(`Failed to save strategy: ${error.message}`);
 								}
+							}
+							break;
+						case 'deployLive':
+							try {
+								const deploymentId = Date.now();
+								const deployConfig = {
+									deployment_id: deploymentId,
+									strategy_name: message.config.strategy_name || 'Visual Strategy',
+									ticker: message.config.ticker,
+									mode: 'paper',
+									position_size: message.config.position_size || 100,
+									order_type: 'MARKET',
+									strategy_code: message.config.strategy_code
+								};
+								const strategiesDir = await getStrategiesDirectory();
+								const deploymentsDir = vscode.Uri.joinPath(strategiesDir, 'deployments');
+								await vscode.workspace.fs.createDirectory(deploymentsDir);
+								const configPath = vscode.Uri.joinPath(deploymentsDir, `deployment_${deploymentId}.json`);
+								await vscode.workspace.fs.writeFile(configPath, new TextEncoder().encode(JSON.stringify(deployConfig, null, 2)));
+
+								// Create terminal and run live trader
+								// Get python path from venv
+								const pythonPath = await ensurePythonEnvironment();
+								const liveTraderPath = vscode.Uri.joinPath(context.extensionUri, 'python', 'live_trader.py').fsPath;
+
+								const cmd = `"${pythonPath}" "${liveTraderPath}" --config "${configPath.fsPath}" --stream --interval 3`;
+								runInExternalTerminal(cmd);
+
+								vscode.window.showInformationMessage(`Deployed ${deployConfig.strategy_name} in paper trading mode. Check terminal for live updates.`);
+
+							} catch (error: any) {
+								vscode.window.showErrorMessage(`Wick: Failed to deploy - ${error.message}`);
 							}
 							break;
 					}
@@ -917,7 +1013,7 @@ export async function ensurePythonEnvironment(): Promise<string> {
 				progress.report({ message: "Installing dependencies (this may take a minute)..." });
 
 				// Install dependencies
-				const packages = ['backtesting', 'yfinance', 'pandas', 'numpy'];
+				const packages = ['backtesting', 'yfinance>=0.2.66', 'pandas', 'numpy', 'python-dotenv', 'requests'];
 				// Note: TA-Lib is complex to install via pip automatically due to system deps.
 				// We'll try to install it, but warn if it fails.
 
@@ -1025,3 +1121,15 @@ export async function fetchYahooCandles(
 
 // This method is called when your extension is deactivated
 export function deactivate() { }
+
+function runInExternalTerminal(command: string) {
+	const terminal = 'ptyxis';
+	const bashCommand = `${command}; echo; read -p "Press Enter to close..."`;
+	const args = ['--', 'fish', '-c', bashCommand];
+
+	const subprocess = spawn(terminal, args, { detached: true, stdio: 'ignore' });
+	subprocess.on('error', (err) => {
+		vscode.window.showErrorMessage(`Failed to launch external terminal (${terminal}): ${err.message}`);
+	});
+	subprocess.unref();
+}

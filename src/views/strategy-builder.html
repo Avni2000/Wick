@@ -245,6 +245,18 @@
             margin-top: 4px;
         }
 
+        /* Hide up/down arrows in number inputs */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
         /* Node Colors */
         .header-indicator {
             background: #7E57C2;
@@ -546,6 +558,10 @@
                 <i class="fas fa-play" style="margin-right: 6px;"></i>
                 Run Backtest
             </button>
+            <button class="btn" id="deployLiveBtn" style="background: #FFA726;">
+                <i class="fas fa-rocket" style="margin-right: 6px;"></i>
+                Deploy Live
+            </button>
         </div>
     </div>
 
@@ -651,6 +667,8 @@
                 </div>
             </div>
         </div>
+
+
     </div>
 
     <script>
@@ -1058,6 +1076,13 @@ class FlowStrategy(Strategy):
                     content.classList.remove('active');
                 }
             });
+
+            // Fix for Drawflow connections disappearing when switching tabs
+            if (tabId === 'builder') {
+                setTimeout(() => {
+                    window.dispatchEvent(new Event('resize'));
+                }, 100);
+            }
         }
 
         // --- Sidebar Logic ---
@@ -1117,24 +1142,43 @@ class FlowStrategy(Strategy):
             });
         });
 
+        document.getElementById('deployLiveBtn').addEventListener('click', () => {
+            const code = generateCode();
+            if (!code) return;
+
+            const config = {
+                ticker: document.getElementById('tickerInput').value,
+                strategy_code: code,
+                strategy_name: 'Visual Strategy',
+                mode: 'paper',  // Always paper mode for safety
+                position_size: 100
+            };
+
+            vscode.postMessage({
+                command: 'deployLive',
+                config: config
+            });
+        });
+
         document.getElementById('clearBtn').addEventListener('click', () => {
             editor.clearModuleSelected();
         });
 
         document.getElementById('exampleBtn').addEventListener('click', () => {
-            // Simple RSI Strategy Example
+            // Complex Strategy Example
             editor.clearModuleSelected();
 
-            // Add nodes
-            addNodeToDrawflow('rsi', 100, 100);
-            addNodeToDrawflow('action', 500, 100);
+            // Add nodes centered in the view
+            // We assume a standard viewport and place nodes to be visible
+            const rsi = editor.addNode('rsi', 0, 1, 100, 150, 'rsi', { period: 14, op: '>', value: 30 }, html_rsi);
+            const sma = editor.addNode('sma', 0, 1, 100, 350, 'sma', { period: 20, op: '>', value: 100 }, html_sma);
+            const and = editor.addNode('and', 1, 1, 400, 250, 'and', {}, html_and);
+            const action = editor.addNode('action', 1, 0, 700, 250, 'action', { action: 'buy_all', size: 100 }, html_action);
 
-            // Connect them (Manual connection simulation or just visual placement)
-            // Note: Drawflow programmatic connection is a bit complex, 
-            // for now we just place them. User can connect.
-
-            // Actually, let's try to connect them if possible, but IDs are dynamic.
-            // We'll just place them for now.
+            // Connect nodes
+            editor.addConnection(rsi, and, 'output_1', 'input_1');
+            editor.addConnection(sma, and, 'output_1', 'input_1');
+            editor.addConnection(and, action, 'output_1', 'input_1');
         });
 
         document.getElementById('pullFromChartBtn').addEventListener('click', () => {
@@ -1156,6 +1200,17 @@ class FlowStrategy(Strategy):
                     if (message.ticker) document.getElementById('tickerInput').value = message.ticker;
                     if (message.start) document.getElementById('startDate').value = new Date(message.start * 1000).toISOString().split('T')[0];
                     if (message.end) document.getElementById('endDate').value = new Date(message.end * 1000).toISOString().split('T')[0];
+                    break;
+                case 'deploymentOutput':
+                    const terminal = document.getElementById('deployTerminal');
+                    if (terminal) {
+                        terminal.innerHTML += message.output;
+                        terminal.scrollTop = terminal.scrollHeight;  // Auto-scroll to bottom
+                    }
+                    break;
+                case 'clearDeploymentOutput':
+                    const term = document.getElementById('deployTerminal');
+                    if (term) term.innerHTML = '';
                     break;
             }
         });

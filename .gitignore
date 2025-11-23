@@ -3,7 +3,7 @@ node_modules
 # Build output
 dist/
 out/
-
+python/__pycache__
 # Dependencies
 node_modules/
 

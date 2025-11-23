@@ -42,6 +42,20 @@
             background: var(--vscode-sideBar-background, #1e1e1e);
             font-size: 13px;
             line-height: var(--row-h);
+            overflow: hidden;
+        }
+
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        *::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Hide scrollbar for IE, Edge and Firefox */
+        * {
+            -ms-overflow-style: none;
+            /* IE and Edge */
+            scrollbar-width: none;
+            /* Firefox */
         }
 
         /* Sidebar container */
@@ -184,7 +198,8 @@
             justify-content: center;
         }
 
-        .folder-header:hover .add-button {
+        .folder-header:hover .add-button,
+        .file-item:hover .add-button {
             opacity: 1;
         }
 
@@ -355,8 +370,8 @@
         document.addEventListener('click', (e) => {
             const row = e.target.closest('.file-item');
             if (!row) return;
-            // If clicking the run button, don't select the row
-            if (e.target.closest('.run-btn')) return;
+            // If clicking the run or deploy button, don't select the row
+            if (e.target.closest('.run-btn') || e.target.closest('.deploy-btn')) return;
 
             e.stopPropagation();
             document.querySelectorAll('.file-item.selected').forEach(n => n.classList.remove('selected'));
@@ -379,6 +394,12 @@
         function runCustomBacktest(event, fileName) {
             event.stopPropagation();
             vscode.postMessage({ command: 'runCustomBacktest', fileName: fileName });
+        }
+
+        // Deploy Live (Paper Trading)
+        function deployLive(event, fileName) {
+            event.stopPropagation();
+            vscode.postMessage({ command: 'deployLiveFromFile', fileName: fileName });
         }
 
         // Open Settings
@@ -469,6 +490,15 @@
                 runBtn.innerHTML = '<span class="codicon codicon-play"></span>';
                 runBtn.onclick = (e) => runCustomBacktest(e, fileName);
                 fileItem.appendChild(runBtn);
+
+                // Deploy Live button
+                const deployBtn = document.createElement('button');
+                deployBtn.className = 'add-button deploy-btn';
+                deployBtn.title = 'Deploy Live (Paper Trading)';
+                deployBtn.innerHTML = '<span class="codicon codicon-rocket"></span>';
+                deployBtn.style.color = '#FFA726';
+                deployBtn.onclick = (e) => deployLive(e, fileName);
+                fileItem.appendChild(deployBtn);
             }
 
             return fileItem;
