@@ -687,6 +687,14 @@ export async function activate(context: vscode.ExtensionContext) {
 								vscode.window.showErrorMessage(`Wick: Failed to deploy - ${error.message}`);
 							}
 							break;
+						case 'copyToClipboard':
+							try {
+								await vscode.env.clipboard.writeText(message.text);
+								vscode.window.showInformationMessage('Context copied to clipboard! Paste into GitHub Copilot.');
+							} catch (error: any) {
+								vscode.window.showErrorMessage(`Failed to copy to clipboard: ${error.message}`);
+							}
+							break;
 					}
 				},
 				undefined,

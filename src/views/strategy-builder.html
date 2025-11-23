@@ -558,6 +558,10 @@
                 <i class="fas fa-play" style="margin-right: 6px;"></i>
                 Run Backtest
             </button>
+            <button class="btn btn-secondary" id="copyContextBtn">
+                <i class="fas fa-robot" style="margin-right: 6px;"></i>
+                Copy Context
+            </button>
             <button class="btn" id="deployLiveBtn" style="background: #FFA726;">
                 <i class="fas fa-rocket" style="margin-right: 6px;"></i>
                 Deploy Live
@@ -1157,6 +1161,42 @@ class FlowStrategy(Strategy):
             vscode.postMessage({
                 command: 'deployLive',
                 config: config
+            });
+        });
+
+        document.getElementById('copyContextBtn').addEventListener('click', () => {
+            const code = generateCode();
+            if (!code) {
+                // Even if no code is generated (incomplete flow), we can still export the JSON
+                // But usually we want the code. Let's try to export whatever we have.
+            }
+
+            const nodeData = editor.export();
+            const ticker = document.getElementById('tickerInput').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            const context = `I am working on a trading strategy using a node-based editor.
+Here is the configuration:
+- Ticker: ${ticker}
+- Start Date: ${startDate}
+- End Date: ${endDate}
+
+Here is the generated Python code for my strategy:
+\`\`\`python
+${code || '# No valid code generated yet'}
+\`\`\`
+
+Here is the underlying node configuration (JSON):
+\`\`\`json
+${JSON.stringify(nodeData, null, 2)}
+\`\`\`
+
+Please help me with understanding why this backtest isn't profitable and what settings I can change?`;
+
+            vscode.postMessage({
+                command: 'copyToClipboard',
+                text: context
             });
         });
 
