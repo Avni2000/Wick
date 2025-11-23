@@ -39,6 +39,46 @@
             padding: 10px 14px;
             border-radius: 8px;
             border: 1px solid #3e3e42;
+            min-width: 250px;
+        }
+
+        .ticker-input-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .ticker-input {
+            flex: 1;
+            background: rgba(60, 60, 60, 0.8);
+            border: 1px solid #3e3e42;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .ticker-input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .search-btn {
+            background: #007acc;
+            border: none;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .search-btn:hover {
+            background: #005a9e;
         }
 
         .ticker-name {
@@ -93,6 +133,10 @@
 
 <body>
     <div class="ticker-header">
+        <div class="ticker-input-container">
+            <input type="text" class="ticker-input" id="tickerInput" placeholder="Enter ticker symbol..." />
+            <button class="search-btn" id="searchBtn">Search</button>
+        </div>
         <div class="ticker-name" id="ticker"></div>
         <div class="ticker-price" id="price">Loading…</div>
     </div>
@@ -120,6 +164,11 @@
             const container = document.getElementById('chart');
             const priceEl = document.getElementById('price');
             const tickerEl = document.getElementById('ticker');
+            const tickerInput = document.getElementById('tickerInput');
+            const searchBtn = document.getElementById('searchBtn');
+
+            // Current ticker state
+            let currentTicker = TICKER;
 
             const chart = LWC.createChart(container, {
                 width: container.clientWidth,
@@ -146,15 +195,18 @@
             });
 
             tickerEl.textContent = TICKER.toUpperCase();
+            tickerInput.value = TICKER.toUpperCase();
             priceEl.textContent = 'Fetching data...';
 
             // Store current range
             let currentRange = DEFAULT_RANGE;
 
-            // Function to fetch data for a specific range
-            function fetchRange(range) {
+            // Function to fetch data for a specific ticker and range
+            function fetchData(ticker, range) {
+                currentTicker = ticker;
                 currentRange = range;
                 priceEl.textContent = 'Loading...';
+                tickerEl.textContent = ticker.toUpperCase();
 
                 // Determine appropriate interval based on range
                 let interval = '1d';
@@ -165,11 +217,31 @@
 
                 vscode.postMessage({
                     command: 'fetchStockData',
-                    ticker: TICKER,
+                    ticker: ticker,
                     range: range,
                     interval: interval
                 });
             }
+
+            // Function to fetch data for a specific range (keeping current ticker)
+            function fetchRange(range) {
+                fetchData(currentTicker, range);
+            }
+
+            // Handle ticker search
+            function searchTicker() {
+                const newTicker = tickerInput.value.trim().toUpperCase();
+                if (newTicker && newTicker !== currentTicker) {
+                    fetchData(newTicker, currentRange);
+                }
+            }
+
+            searchBtn.addEventListener('click', searchTicker);
+            tickerInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchTicker();
+                }
+            });
 
             // Setup range selector buttons
             const rangeButtons = document.querySelectorAll('.range-btn');

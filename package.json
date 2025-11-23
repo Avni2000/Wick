@@ -14,12 +14,14 @@
   },
   "homepage": "https://github.com/Avni2000/Wick#readme",
   "engines": {
-    "vscode": "^1.106.1"
+    "vscode": "^1.80.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "*"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -28,6 +30,16 @@
         "title": "Wick: Show Chart"
       }
     ],
+    "configuration": {
+      "title": "Wick Trading",
+      "properties": {
+        "wick.strategiesDirectory": {
+          "type": "string",
+          "default": "~/source/repos/strategies",
+          "description": "Directory where trading strategy files are stored"
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -41,7 +53,8 @@
       "wick-sidebar": [
         {
           "id": "wick-main",
-          "name": "Trading Dashboard"
+          "name": "Trading Dashboard",
+          "type": "webview"
         }
       ]
     }

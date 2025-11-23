@@ -3,6 +3,8 @@
 import * as vscode from 'vscode';
 import { TextDecoder } from 'util';
 
+console.log('Wick extension file is being loaded!');
+
 // Types for candle data
 export type Candle = {
 	time: number;
@@ -15,34 +17,225 @@ export type Candle = {
 
 // Sidebar View Provider
 class WickViewProvider implements vscode.WebviewViewProvider {
-	constructor(private readonly _extensionUri: vscode.Uri) { }
+	private _view?: vscode.WebviewView;
+	private _fileWatcher?: vscode.FileSystemWatcher;
+
+	constructor(
+		private readonly _extensionUri: vscode.Uri
+	) {
+		console.log('WickViewProvider instantiated');
+	}
 
 	public async resolveWebviewView(
 		webviewView: vscode.WebviewView,
 		context: vscode.WebviewViewResolveContext,
 		_token: vscode.CancellationToken
 	) {
+		this._view = webviewView;
+
 		webviewView.webview.options = {
 			enableScripts: true,
 			localResourceRoots: [this._extensionUri]
 		};
 
+		console.log('Resolving webview view for wick-main');
 		webviewView.webview.html = await this.getSidebarContent(webviewView.webview);
+		console.log('Webview HTML set successfully');
+
+		// Send initial file list to the webview
+		await this.sendFileList();
+
+		// Set up file watcher for the strategies directory
+		await this.setupFileWatcher();
 
 		// Handle messages from the webview
-		webviewView.webview.onDidReceiveMessage(message => {
+		webviewView.webview.onDidReceiveMessage(async message => {
 			switch (message.command) {
 				case 'showChart':
 					vscode.commands.executeCommand('wick.showChart');
+					break;
+				case 'requestAddStrategy':
+					await this.promptAndCreateStrategy();
+					break;
+				case 'requestFileList':
+					await this.sendFileList();
 					break;
 			}
 		});
 	}
 
+	private async getStrategiesDirectory(): Promise<vscode.Uri> {
+		const config = vscode.workspace.getConfiguration('wick');
+		let dirPath = config.get<string>('strategiesDirectory', '~/source/repos/strategies');
+
+		// Expand tilde to home directory
+		if (dirPath.startsWith('~/')) {
+			const homeDir = process.env.HOME || process.env.USERPROFILE;
+			if (homeDir) {
+				dirPath = dirPath.replace('~', homeDir);
+			}
+		}
+
+		return vscode.Uri.file(dirPath);
+	}
+
+	private async setupFileWatcher(): Promise<void> {
+		try {
+			const strategiesDir = await this.getStrategiesDirectory();
+			const pattern = new vscode.RelativePattern(strategiesDir.fsPath, '*.py');
+
+			this._fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+			this._fileWatcher.onDidCreate(() => this.sendFileList());
+			this._fileWatcher.onDidDelete(() => this.sendFileList());
+			this._fileWatcher.onDidChange(() => this.sendFileList());
+
+			console.log('File watcher set up for:', strategiesDir.fsPath);
+		} catch (error) {
+			console.error('Failed to set up file watcher:', error);
+		}
+	}
+
+	private async sendFileList(): Promise<void> {
+		if (!this._view) {
+			return;
+		}
+
+		try {
+			const strategiesDir = await this.getStrategiesDirectory();
+
+			// Ensure directory exists
+			try {
+				await vscode.workspace.fs.createDirectory(strategiesDir);
+			} catch (error) {
+				// Directory might already exist
+			}
+
+			// List all .py files
+			const files = await vscode.workspace.fs.readDirectory(strategiesDir);
+			const pyFiles = files
+				.filter(([name, type]) => type === vscode.FileType.File && name.endsWith('.py'))
+				.map(([name]) => name)
+				.sort();
+
+			this._view.webview.postMessage({
+				type: 'fileList',
+				files: pyFiles
+			});
+
+			console.log('Sent file list to webview:', pyFiles);
+		} catch (error) {
+			console.error('Failed to send file list:', error);
+		}
+	}
+
+	private async promptAndCreateStrategy(): Promise<void> {
+		const fileName = await vscode.window.showInputBox({
+			prompt: 'Enter strategy file name',
+			placeHolder: 'custom_strategy.py',
+			validateInput: (value) => {
+				if (!value || !value.trim()) {
+					return 'Filename cannot be empty';
+				}
+				if (!value.endsWith('.py')) {
+					return 'Filename must end with .py';
+				}
+				return null;
+			}
+		});
+
+		if (fileName) {
+			await this.createStrategyFile(fileName.trim());
+		}
+	}
+
+	private async createStrategyFile(fileName: string): Promise<void> {
+		try {
+			// Validate filename
+			if (!fileName || !fileName.trim()) {
+				vscode.window.showErrorMessage('Wick: Filename cannot be empty');
+				return;
+			}
+
+			const trimmedName = fileName.trim();
+
+			// Get strategies directory
+			const strategiesDir = await this.getStrategiesDirectory();
+
+			// Ensure strategies directory exists
+			try {
+				await vscode.workspace.fs.createDirectory(strategiesDir);
+			} catch (error) {
+				// Directory might already exist, that's fine
+			}
+
+			// Create the file path
+			const filePath = vscode.Uri.joinPath(strategiesDir, trimmedName);
+
+			// Check if file already exists
+			try {
+				await vscode.workspace.fs.stat(filePath);
+				vscode.window.showWarningMessage(`Wick: File "${trimmedName}" already exists`);
+				return;
+			} catch {
+				// File doesn't exist, proceed with creation
+			}
+
+			// Create the file with a basic template
+			const template = `# ${trimmedName}
+# Created with Wick Trading Extension
+
+def strategy():
+    """
+    Your trading strategy implementation goes here.
+    """
+    pass
+`;
+			const content = new TextEncoder().encode(template);
+			await vscode.workspace.fs.writeFile(filePath, content);
+
+			// Show success message
+			vscode.window.showInformationMessage(`Wick: Created "${trimmedName}"`);
+
+			// Open the file in the editor
+			const document = await vscode.workspace.openTextDocument(filePath);
+			await vscode.window.showTextDocument(document);
+
+			console.log(`Created strategy file: ${filePath.fsPath}`);
+
+			// File list will be updated automatically by the file watcher
+		} catch (error: any) {
+			console.error('Failed to create strategy file:', error);
+			vscode.window.showErrorMessage(`Wick: Failed to create file - ${error.message}`);
+		}
+	}
+
 	private async getSidebarContent(webview: vscode.Webview): Promise<string> {
-		const uri = vscode.Uri.joinPath(this._extensionUri, 'src', 'views', 'sidebar.html');
-		const uint8Array = await vscode.workspace.fs.readFile(uri);
-		return new TextDecoder().decode(uint8Array);
+		try {
+			const uri = vscode.Uri.joinPath(this._extensionUri, 'dist', 'views', 'sidebar.html');
+			console.log('Loading sidebar from:', uri.toString());
+			const uint8Array = await vscode.workspace.fs.readFile(uri);
+			const content = new TextDecoder().decode(uint8Array);
+			console.log('Sidebar content loaded, length:', content.length);
+			return content;
+		} catch (error) {
+			console.error('Failed to load sidebar content:', error);
+			// Return a fallback HTML in case of error
+			return `<!DOCTYPE html>
+<html>
+<head><title>Wick Trading</title></head>
+<body>
+	<h3>Wick Trading</h3>
+	<p>Error loading sidebar: ${error}</p>
+	<button onclick="acquireVsCodeApi().postMessage({command: 'showChart'})">Open Chart</button>
+	<script>const vscode = acquireVsCodeApi();</script>
+</body>
+</html>`;
+		}
+	}
+
+	public dispose(): void {
+		this._fileWatcher?.dispose();
 	}
 }
 
@@ -56,9 +249,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Register the sidebar view provider
 	const provider = new WickViewProvider(context.extensionUri);
+	console.log('Registering webview view provider for wick-main');
 	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider('wick-main', provider)
+		vscode.window.registerWebviewViewProvider('wick-main', provider, {
+			webviewOptions: {
+				retainContextWhenHidden: true
+			}
+		})
 	);
+	console.log('Webview view provider registered successfully');
 
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
@@ -111,11 +310,19 @@ export function activate(context: vscode.ExtensionContext) {
 		);
 	});
 
+	// Register command to manually focus the sidebar
+	context.subscriptions.push(
+		vscode.commands.registerCommand('wick.focusSidebar', async () => {
+			console.log('Executing wick.focusSidebar command');
+			await vscode.commands.executeCommand('wick-main.focus');
+		})
+	);
+
 	context.subscriptions.push(disposable);
 }
 
 async function getWebviewContent(ticker: string, extensionUri: vscode.Uri): Promise<string> {
-	const uri = vscode.Uri.joinPath(extensionUri, 'src', 'views', 'chart.html');
+	const uri = vscode.Uri.joinPath(extensionUri, 'dist', 'views', 'chart.html');
 	const uint8Array = await vscode.workspace.fs.readFile(uri);
 	const template = new TextDecoder().decode(uint8Array);
 	return template
