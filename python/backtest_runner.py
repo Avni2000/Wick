@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""
+Backtest Runner for Wick Strategy Builder
+Accepts strategy code and configuration via stdin, runs backtest, outputs JSON results
+"""
+
+import sys
+import json
+import yfinance as yf
+from backtesting import Backtest, Strategy
+import pandas as pd
+try:
+    import talib
+except ImportError:
+    talib = None
+
+def main():
+    try:
+        # Read config from stdin
+        input_data = sys.stdin.read()
+        config = json.loads(input_data)
+        
+        ticker = config['ticker']
+        start = config['start']
+        end = config['end']
+        strategy_code = config['strategy_code']
+        
+        # Download data
+        data = yf.download(ticker, start=start, end=end, progress=False)
+        
+        if data.empty:
+            print(json.dumps({
+                'error': f'No data available for {ticker} in the specified date range'
+            }))
+            sys.exit(1)
+        
+        # Ensure proper column names for backtesting.py (expects capitalized names)
+        data.columns = [col.capitalize() for col in data.columns]
+        
+        # Execute strategy code to define RSIStrategy class
+        exec_globals = {'Strategy': Strategy, 'Backtest': Backtest, 'pd': pd}
+        if talib:
+            exec_globals['talib'] = talib
+        exec(strategy_code, exec_globals)
+        
+        # Get the strategy class
+        RSIStrategy = exec_globals.get('RSIStrategy')
+        if not RSIStrategy:
+            print(json.dumps({'error': 'RSIStrategy class not found in generated code'}))
+            sys.exit(1)
+        
+        # Run backtest
+        bt = Backtest(data, RSIStrategy, cash=10000, commission=.002)
+        stats = bt.run()
+        
+        # Extract equity curve
+        equity_curve = []
+        if hasattr(stats, '_equity_curve') and stats._equity_curve is not None:
+            equity_df = stats._equity_curve['Equity']
+            for timestamp, value in equity_df.items():
+                equity_curve.append({
+                    'time': int(timestamp.timestamp()),
+                    'value': float(value)
+                })
+        
+        # Return results as JSON
+        results = {
+            'return': float(stats['Return [%]']),
+            'sharpe': float(stats['Sharpe Ratio']) if pd.notna(stats['Sharpe Ratio']) else 0.0,
+            'max_drawdown': float(stats['Max. Drawdown [%]']),
+            'num_trades': int(stats['# Trades']),
+            'win_rate': float(stats['Win Rate [%]']) if pd.notna(stats['Win Rate [%]']) else 0.0,
+            'equity_curve': equity_curve
+        }
+        
+        print(json.dumps(results))
+        
+    except Exception as e:
+        print(json.dumps({
+            'error': str(e)
+        }))
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()

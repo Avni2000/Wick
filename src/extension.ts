@@ -1,7 +1,8 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { TextDecoder } from 'util';
+import { spawn, exec } from 'child_process';
+import * as path from 'path';
+import * as fs from 'fs';
 
 console.log('Wick extension file is being loaded!');
 
@@ -59,6 +60,9 @@ class WickViewProvider implements vscode.WebviewViewProvider {
 					break;
 				case 'requestFileList':
 					await this.sendFileList();
+					break;
+				case 'showStrategyBuilder':
+					vscode.commands.executeCommand('wick.showStrategyBuilder');
 					break;
 			}
 		});
@@ -318,6 +322,54 @@ export function activate(context: vscode.ExtensionContext) {
 		})
 	);
 
+	// Register strategy builder command
+	context.subscriptions.push(
+		vscode.commands.registerCommand('wick.showStrategyBuilder', async () => {
+			const panel = vscode.window.createWebviewPanel(
+				'wickStrategyBuilder',
+				'Strategy Builder',
+				vscode.ViewColumn.One,
+				{
+					enableScripts: true,
+					retainContextWhenHidden: true
+				}
+			);
+
+			// Set the webview's HTML content
+			panel.webview.html = await getStrategyBuilderContent(context.extensionUri);
+
+			// Handle messages from the webview
+			panel.webview.onDidReceiveMessage(
+				async message => {
+					switch (message.command) {
+						case 'runBacktest':
+							try {
+								const results = await runBacktest(message.config, context.extensionUri);
+								panel.webview.postMessage({
+									type: 'backtestResults',
+									results: results
+								});
+							} catch (error: any) {
+								panel.webview.postMessage({
+									type: 'backtestError',
+									error: error.message
+								});
+							}
+							break;
+					}
+				},
+				undefined,
+				context.subscriptions
+			);
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('wick.openSettings', () => {
+			vscode.commands.executeCommand('workbench.action.openSettings', 'wick');
+		})
+	);
+
 	context.subscriptions.push(disposable);
 }
 
@@ -328,6 +380,201 @@ async function getWebviewContent(ticker: string, extensionUri: vscode.Uri): Prom
 	return template
 		.replace('{{ticker}}', ticker) // Replace title (no quotes needed)
 		.replace('{{ ticker }}', JSON.stringify(ticker)); // Replace JS variable (needs quotes)
+}
+
+async function getStrategyBuilderContent(extensionUri: vscode.Uri): Promise<string> {
+	const uri = vscode.Uri.joinPath(extensionUri, 'dist', 'views', 'strategy-builder.html');
+	const uint8Array = await vscode.workspace.fs.readFile(uri);
+	return new TextDecoder().decode(uint8Array);
+}
+
+
+
+async function runBacktest(config: any, extensionUri: vscode.Uri): Promise<any> {
+	return new Promise(async (resolve, reject) => {
+		try {
+			// Ensure Python environment is set up
+			const pythonPath = await ensurePythonEnvironment();
+
+			// Path to backtest_runner.py
+			const scriptPath = vscode.Uri.joinPath(extensionUri, 'python', 'backtest_runner.py').fsPath;
+
+			console.log(`Running backtest with Python: ${pythonPath}`);
+			console.log(`Script path: ${scriptPath}`);
+
+			// Spawn Python process
+			const pythonProcess = spawn(pythonPath, [scriptPath]);
+
+			let stdout = '';
+			let stderr = '';
+
+			pythonProcess.stdout.on('data', (data) => {
+				stdout += data.toString();
+			});
+
+			pythonProcess.stderr.on('data', (data) => {
+				stderr += data.toString();
+			});
+
+			pythonProcess.on('close', (code) => {
+				console.log(`Python process exited with code ${code}`);
+				console.log('Stdout:', stdout);
+				console.log('Stderr:', stderr);
+
+				if (code !== 0) {
+					console.error(`Python process exited with code ${code}`);
+					console.error('Stderr:', stderr);
+					reject(new Error(stderr || `Python process exited with code ${code}`));
+					return;
+				}
+
+				try {
+					const result = JSON.parse(stdout);
+
+					// Check if result contains an error
+					if (result.error) {
+						reject(new Error(result.error));
+					} else {
+						resolve(result);
+					}
+				} catch (error: any) {
+					console.error('Failed to parse JSON output:', stdout);
+					reject(new Error(`Failed to parse backtest results: ${error.message}\n\nOutput: ${stdout}`));
+				}
+			});
+
+			pythonProcess.on('error', (error) => {
+				console.error('Failed to start Python process:', error);
+				reject(new Error(`Failed to start Python: ${error.message}. Make sure Python 3 is installed.`));
+			});
+
+			// Send config to Python via stdin
+			pythonProcess.stdin.write(JSON.stringify(config));
+			pythonProcess.stdin.end();
+
+		} catch (error: any) {
+			reject(error);
+		}
+	});
+}
+
+async function ensurePythonEnvironment(): Promise<string> {
+	const config = vscode.workspace.getConfiguration('wick');
+	let strategiesDir = config.get<string>('strategiesDirectory', '~/source/repos/strategies');
+
+	// Expand tilde
+	if (strategiesDir.startsWith('~/')) {
+		const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+		strategiesDir = strategiesDir.replace('~', homeDir);
+	}
+
+	// Ensure strategies directory exists
+	if (!fs.existsSync(strategiesDir)) {
+		fs.mkdirSync(strategiesDir, { recursive: true });
+	}
+
+	const venvPath = path.join(strategiesDir, '.venv');
+	const isWindows = process.platform === 'win32';
+	const pythonExecutable = isWindows
+		? path.join(venvPath, 'Scripts', 'python.exe')
+		: path.join(venvPath, 'bin', 'python');
+
+	const pipExecutable = isWindows
+		? path.join(venvPath, 'Scripts', 'pip.exe')
+		: path.join(venvPath, 'bin', 'pip');
+
+	// Check if venv exists
+	if (!fs.existsSync(pythonExecutable)) {
+		console.log(`Python venv not found at: ${pythonExecutable}`);
+		const selection = await vscode.window.showInformationMessage(
+			'Wick requires a Python environment for backtesting. Would you like to create one now? (This will install backtesting, yfinance, pandas, and numpy)',
+			{ modal: true },
+			'Create Environment', 'Cancel'
+		);
+
+		if (selection !== 'Create Environment') {
+			console.log('User declined to create Python environment');
+			throw new Error('Python environment setup was cancelled. Please create a Python environment to run backtests.');
+		}
+
+		try {
+			await vscode.window.withProgress({
+				location: vscode.ProgressLocation.Notification,
+				title: "Setting up Wick trading environment...",
+				cancellable: false
+			}, async (progress) => {
+				progress.report({ message: "Creating virtual environment..." });
+
+				// Create venv
+				await new Promise<void>((resolve, reject) => {
+					console.log(`Creating venv at: ${venvPath}`);
+					exec(`python3 -m venv "${venvPath}"`, (error, stdout, stderr) => {
+						if (error) {
+							console.log(`python3 failed, trying python: ${error.message}`);
+							console.log(`stderr: ${stderr}`);
+							// Try 'python' if 'python3' fails (e.g. Windows)
+							exec(`python -m venv "${venvPath}"`, (err2, stdout2, stderr2) => {
+								if (err2) {
+									console.error(`Both python3 and python failed:`, err2.message);
+									console.error(`stderr: ${stderr2}`);
+									reject(new Error(`Failed to create venv. Please ensure Python 3 is installed.\n\nError: ${err2.message}\nDetails: ${stderr2}`));
+								} else {
+									console.log('venv created successfully with python');
+									resolve();
+								}
+							});
+						} else {
+							console.log('venv created successfully with python3');
+							resolve();
+						}
+					});
+				});
+
+				progress.report({ message: "Installing dependencies (this may take a minute)..." });
+
+				// Install dependencies
+				const packages = ['backtesting', 'yfinance', 'pandas', 'numpy'];
+				// Note: TA-Lib is complex to install via pip automatically due to system deps.
+				// We'll try to install it, but warn if it fails.
+
+				await new Promise<void>((resolve, reject) => {
+					const installCmd = `"${pipExecutable}" install ${packages.join(' ')}`;
+					console.log(`Installing packages: ${installCmd}`);
+					exec(installCmd, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+						if (error) {
+							console.error(`Failed to install packages:`, error.message);
+							console.error(`stdout: ${stdout}`);
+							console.error(`stderr: ${stderr}`);
+							reject(new Error(`Failed to install dependencies.\n\nError: ${error.message}\nDetails: ${stderr}`));
+						} else {
+							console.log(`Packages installed successfully`);
+							console.log(`stdout: ${stdout}`);
+							resolve();
+						}
+					});
+				});
+
+				// Try installing ta-lib separately (might fail if system deps missing)
+				try {
+					await new Promise<void>((resolve, reject) => {
+						exec(`"${pipExecutable}" install TA-Lib`, (error) => {
+							if (error) reject(error); else resolve();
+						});
+					});
+				} catch (e) {
+					vscode.window.showWarningMessage('Wick: Could not install TA-Lib automatically. You may need to install system dependencies.');
+				}
+			});
+
+			vscode.window.showInformationMessage('Wick: Environment set up successfully!');
+		} catch (error: any) {
+			console.error('Failed to set up Python environment:', error);
+			vscode.window.showErrorMessage(`Failed to set up Python environment: ${error.message}`);
+			throw error;
+		}
+	}
+
+	return pythonExecutable;
 }
 
 export async function fetchYahooCandles(

@@ -233,6 +233,7 @@
     <aside class="sidebar" role="navigation" aria-label="Wick Trading Sidebar">
         <!-- Tabs -->
         <button class="tab-item active" role="tab" aria-selected="true" data-tab="chart">Chart</button>
+        <button class="tab-item" role="tab" aria-selected="false" data-tab="strategy-builder">Strategy Builder</button>
         <button class="tab-item" role="tab" aria-selected="false" data-tab="backtesting">Backtesting</button>
 
         <!-- Files/Sections -->
@@ -296,8 +297,11 @@
             document.querySelectorAll('.tab-content-area').forEach(c => c.classList.remove('active'));
             const contentArea = document.getElementById(`${tabName}-content`);
             if (contentArea) contentArea.classList.add('active');
+
             if (tabName === 'chart') {
                 vscode.postMessage({ command: 'showChart' });
+            } else if (tabName === 'strategy-builder') {
+                vscode.postMessage({ command: 'showStrategyBuilder' });
             }
         }
 

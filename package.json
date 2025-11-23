@@ -28,6 +28,14 @@
       {
         "command": "wick.showChart",
         "title": "Wick: Show Chart"
+      },
+      {
+        "command": "wick.showStrategyBuilder",
+        "title": "Wick: Strategy Builder"
+      },
+      {
+        "command": "wick.openSettings",
+        "title": "Wick: Open Settings"
       }
     ],
     "configuration": {
@@ -37,6 +45,11 @@
           "type": "string",
           "default": "~/source/repos/strategies",
           "description": "Directory where trading strategy files are stored"
+        },
+        "wick.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Path to Python interpreter for running backtests"
         }
       }
     },

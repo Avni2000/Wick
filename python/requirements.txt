@@ -1,0 +1,5 @@
+backtesting
+yfinance
+pandas
+numpy
+TA-Lib
