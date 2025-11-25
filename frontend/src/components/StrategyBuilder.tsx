@@ -9,6 +9,7 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import dagre from 'dagre'
 import { useStrategyStore } from '../store/strategyStore'
 import { LogicNode, IndicatorNode, PriceNode, ActionNode, ExitNode } from './nodes/CustomNodes'
 import NodePalette from './NodePalette'
@@ -32,7 +33,7 @@ export default function StrategyBuilder({
   onBacktestResults: (results: any) => void
   onSwitchTab?: (tab: 'builder' | 'backtest' | 'live') => void
 }) {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, setStrategyCode, addNode } = useStrategyStore()
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, setStrategyCode, addNode, setNodes } = useStrategyStore()
   const [showCode, setShowCode] = useState(false)
   const [generatedCode, setGeneratedCode] = useState('')
   const [showBacktestModal, setShowBacktestModal] = useState(false)
@@ -46,7 +47,7 @@ export default function StrategyBuilder({
     commission: 0.002
   })
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, fitView } = useReactFlow()
   const hideInfoTimeout = useRef<number | null>(null)
 
   const handleShowInfo = (title: string, description: string) => {
@@ -63,6 +64,97 @@ export default function StrategyBuilder({
       setShowInfoPanel(false)
     }, 200) // 200ms delay to allow moving mouse to panel
   }
+
+  // Auto-layout function using dagre
+  const handleAutoLayout = useCallback(() => {
+    if (nodes.length === 0) return
+
+    const dagreGraph = new dagre.graphlib.Graph()
+    dagreGraph.setDefaultEdgeLabel(() => ({}))
+    
+    // Configure graph layout: left-to-right flow with better spacing
+    dagreGraph.setGraph({ 
+      rankdir: 'LR',  // Left to Right
+      nodesep: 100,   // Vertical spacing between nodes in same column
+      ranksep: 250,   // Horizontal spacing between columns
+      marginx: 100,
+      marginy: 100,
+      ranker: 'longest-path', // Better balancing for tree structures
+    })
+
+    // Get actual node dimensions based on node type
+    const getNodeDimensions = (node: any) => {
+      // Logic nodes are smaller
+      if (node.type === 'logic') {
+        return { width: 120, height: 60 }
+      }
+      // Action nodes are medium
+      if (node.type === 'action') {
+        return { width: 200, height: 120 }
+      }
+      // Exit nodes
+      if (node.type === 'exit') {
+        return { width: 200, height: 140 }
+      }
+      // Indicator and Price nodes are tallest (with all the controls)
+      return { width: 240, height: 220 }
+    }
+
+    // Calculate node depths to ensure balanced tree layout
+    const getNodeDepth = (nodeId: string, visited = new Set<string>()): number => {
+      if (visited.has(nodeId)) return 0
+      visited.add(nodeId)
+      
+      const outgoingEdges = edges.filter(e => e.source === nodeId)
+      if (outgoingEdges.length === 0) return 0
+      
+      return 1 + Math.max(...outgoingEdges.map(e => getNodeDepth(e.target, visited)))
+    }
+
+    // Group nodes that should be at the same rank (feeding into same targets)
+    const targetGroups = new Map<string, Set<string>>()
+    edges.forEach(edge => {
+      if (!targetGroups.has(edge.target)) {
+        targetGroups.set(edge.target, new Set())
+      }
+      targetGroups.get(edge.target)!.add(edge.source)
+    })
+
+    // Add nodes to dagre graph with their actual dimensions
+    nodes.forEach((node) => {
+      const { width, height } = getNodeDimensions(node)
+      const depth = getNodeDepth(node.id)
+      dagreGraph.setNode(node.id, { width, height, rank: -depth }) // Negative depth for left-to-right
+    })
+
+    // Add edges to dagre graph
+    edges.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target)
+    })
+
+    // Calculate layout
+    dagre.layout(dagreGraph)
+
+    // Apply new positions to nodes
+    const layoutedNodes = nodes.map((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id)
+      const { width, height } = getNodeDimensions(node)
+      return {
+        ...node,
+        position: {
+          x: nodeWithPosition.x - width / 2,
+          y: nodeWithPosition.y - height / 2,
+        },
+      }
+    })
+
+    setNodes(layoutedNodes)
+    
+    // Fit view after layout with padding
+    setTimeout(() => {
+      fitView({ padding: 0.15, duration: 400 })
+    }, 10)
+  }, [nodes, edges, setNodes, fitView])
 
   // Connection validation - prevent invalid connections
   const isValidConnection = useCallback((connection: Connection) => {
@@ -220,7 +312,12 @@ export default function StrategyBuilder({
               onDrop={onDrop}
               nodeTypes={nodeTypes}
               defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+              minZoom={0.1}
+              maxZoom={2}
               fitView
+              fitViewOptions={{ padding: 0.2 }}
+              translateExtent={[[-5000, -5000], [5000, 5000]]}
+              nodeExtent={[[-5000, -5000], [5000, 5000]]}
               deleteKeyCode={['Backspace', 'Delete']}
               edgesReconnectable={true}
               reconnectRadius={20}
@@ -237,6 +334,13 @@ export default function StrategyBuilder({
               <MiniMap className="bg-dark-surface" nodeColor="#374151" />
 
               <Panel position="top-right" className="space-x-2">
+                <button
+                  onClick={handleAutoLayout}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded shadow-lg transition-colors"
+                  title="Automatically arrange nodes in a left-to-right flow"
+                >
+                  Auto Layout
+                </button>
                 <button
                   onClick={handleGenerateCode}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-lg transition-colors"

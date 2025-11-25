@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.17",
+    "@types/dagre": "^0.7.53",
     "@xyflow/react": "^12.9.3",
     "autoprefixer": "^10.4.22",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dagre": "^0.8.5",
     "lightweight-charts": "^5.0.9",
     "lucide-react": "^0.554.0",
     "postcss": "^8.5.6",

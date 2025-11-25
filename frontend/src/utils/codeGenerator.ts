@@ -52,8 +52,12 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
 
       case 'indicator': {
         const config = node.data.config as any || {}
+        const label = String(node.data.label)
         
-        switch (node.data.label) {
+        // Extract indicator name (handle labels like "EMA 12", "RSI 14", etc.)
+        const indicatorName = label.split(' ')[0]
+        
+        switch (indicatorName) {
           case 'RSI':
             return `self.rsi_${config.period || 14}${offsetStr}`
           case 'SMA':
@@ -62,7 +66,7 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
             return `self.ema_${config.period || 20}${offsetStr}`
           case 'MACD':
             return `self.macd${offsetStr}`
-          case 'Bollinger Bands':
+          case 'Bollinger':
             return `self.bb_upper${offsetStr}`
           case 'ATR':
             return `self.atr_${config.period || 14}${offsetStr}`
@@ -193,8 +197,12 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
   const indicators = nodes.filter(n => n.type === 'indicator')
   const indicatorInits = indicators.map(node => {
     const config = node.data.config as any || {}
+    const label = String(node.data.label)
     
-    switch (node.data.label) {
+    // Extract indicator name (handle labels like "EMA 12", "RSI 14", etc.)
+    const indicatorName = label.split(' ')[0]
+    
+    switch (indicatorName) {
       case 'RSI':
         return `        self.rsi_${config.period || 14} = self.I(talib.RSI, self.data.Close, ${config.period || 14})`
       case 'SMA':
@@ -203,7 +211,7 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
         return `        self.ema_${config.period || 20} = self.I(talib.EMA, self.data.Close, ${config.period || 20})`
       case 'MACD':
         return `        macd, signal, hist = self.I(talib.MACD, self.data.Close, ${config.fast || 12}, ${config.slow || 26}, ${config.signal || 9})\n        self.macd = macd\n        self.macd_signal = signal\n        self.macd_hist = hist`
-      case 'Bollinger Bands':
+      case 'Bollinger':
         return `        upper, middle, lower = self.I(talib.BBANDS, self.data.Close, ${config.period || 20}, ${config.std || 2}, ${config.std || 2})\n        self.bb_upper = upper\n        self.bb_middle = middle\n        self.bb_lower = lower`
       case 'ATR':
         return `        self.atr_${config.period || 14} = self.I(talib.ATR, self.data.High, self.data.Low, self.data.Close, ${config.period || 14})`
@@ -236,11 +244,11 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
     if (orderType === 'all') {
       sizeLogic = 'self.buy()'
     } else if (orderType === 'cash') {
-      sizeLogic = `self.buy(size=${amount} / self.data.Close[-1])`
+      sizeLogic = `self.buy(size=max(1, ${amount} / self.data.Close[-1]))`
     } else if (orderType === 'shares') {
       sizeLogic = `self.buy(size=${amount})`
     } else if (orderType === 'percent') {
-      sizeLogic = `self.buy(size=(self.equity * ${amount} / 100) / self.data.Close[-1])`
+      sizeLogic = `self.buy(size=max(1, int((self.equity * ${amount} / 100) / self.data.Close[-1])))`
     }
 
     return { condition, sizeLogic }
@@ -282,6 +290,9 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
     const initLines: string[] = []
     const nextLines: string[] = []
     
+    // Track entry price for exits
+    initLines.push(`        self.entry_price = 0`)
+    
     // Track if we need ATR for any exit
     let needsAtr = false
     let atrPeriod = 14
@@ -300,38 +311,44 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
         case 'Stop Loss':
           if (exitType === 'percent') {
             nextLines.push(`            # Stop Loss (${value}%)`)
-            nextLines.push(`            stop_price = self.position.entry_price * (1 - ${value} / 100)`)
+            nextLines.push(`            stop_price = self.entry_price * (1 - ${value} / 100)`)
             nextLines.push(`            if self.data.Close[-1] <= stop_price:`)
             nextLines.push(`                self.position.close()`)
+            nextLines.push(`                self.entry_price = 0`)
           } else if (exitType === 'fixed') {
             nextLines.push(`            # Stop Loss (fixed $${value})`)
-            nextLines.push(`            stop_price = self.position.entry_price - ${value}`)
+            nextLines.push(`            stop_price = self.entry_price - ${value}`)
             nextLines.push(`            if self.data.Close[-1] <= stop_price:`)
             nextLines.push(`                self.position.close()`)
+            nextLines.push(`                self.entry_price = 0`)
           } else if (exitType === 'atr') {
             nextLines.push(`            # Stop Loss (${value}x ATR)`)
-            nextLines.push(`            stop_price = self.position.entry_price - ${value} * self.exit_atr[-1]`)
+            nextLines.push(`            stop_price = self.entry_price - ${value} * self.exit_atr[-1]`)
             nextLines.push(`            if self.data.Close[-1] <= stop_price:`)
             nextLines.push(`                self.position.close()`)
+            nextLines.push(`                self.entry_price = 0`)
           }
           break
           
         case 'Take Profit':
           if (exitType === 'percent') {
             nextLines.push(`            # Take Profit (${value}%)`)
-            nextLines.push(`            target_price = self.position.entry_price * (1 + ${value} / 100)`)
+            nextLines.push(`            target_price = self.entry_price * (1 + ${value} / 100)`)
             nextLines.push(`            if self.data.Close[-1] >= target_price:`)
             nextLines.push(`                self.position.close()`)
+            nextLines.push(`                self.entry_price = 0`)
           } else if (exitType === 'fixed') {
             nextLines.push(`            # Take Profit (fixed $${value})`)
-            nextLines.push(`            target_price = self.position.entry_price + ${value}`)
+            nextLines.push(`            target_price = self.entry_price + ${value}`)
             nextLines.push(`            if self.data.Close[-1] >= target_price:`)
             nextLines.push(`                self.position.close()`)
+            nextLines.push(`                self.entry_price = 0`)
           } else if (exitType === 'atr') {
             nextLines.push(`            # Take Profit (${value}x ATR)`)
-            nextLines.push(`            target_price = self.position.entry_price + ${value} * self.exit_atr[-1]`)
+            nextLines.push(`            target_price = self.entry_price + ${value} * self.exit_atr[-1]`)
             nextLines.push(`            if self.data.Close[-1] >= target_price:`)
             nextLines.push(`                self.position.close()`)
+            nextLines.push(`                self.entry_price = 0`)
           }
           break
           
@@ -346,6 +363,7 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
             nextLines.push(`            if self.data.Close[-1] <= self.trailing_stop_price:`)
             nextLines.push(`                self.position.close()`)
             nextLines.push(`                self.trailing_stop_price = 0`)
+            nextLines.push(`                self.entry_price = 0`)
           } else if (exitType === 'atr') {
             const multiplier = config.multiplier || 2
             nextLines.push(`            # Trailing Stop (${multiplier}x ATR)`)
@@ -355,6 +373,7 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
             nextLines.push(`            if self.data.Close[-1] <= self.trailing_stop_price:`)
             nextLines.push(`                self.position.close()`)
             nextLines.push(`                self.trailing_stop_price = 0`)
+            nextLines.push(`                self.entry_price = 0`)
           }
           break
       }
@@ -376,13 +395,13 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
   // Generate buy/sell code blocks
   const buyCode = buyLogics.length > 0 
     ? buyLogics.map(({ condition, sizeLogic }) => 
-        `        if ${condition}:\n            if not self.position:\n                ${sizeLogic}`
+        `        if ${condition}:\n            if not self.position:\n                ${sizeLogic}\n                self.entry_price = self.data.Close[-1]`
       ).join('\n        el')
     : ''
 
   const sellCode = sellLogics.length > 0
     ? sellLogics.map(({ condition, sizeLogic }) =>
-        `        if ${condition}:\n            if self.position:\n                ${sizeLogic}`
+        `        if ${condition}:\n            if self.position:\n                ${sizeLogic}\n                self.entry_price = 0`
       ).join('\n        el')
     : ''
 
