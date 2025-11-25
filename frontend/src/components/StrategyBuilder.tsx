@@ -10,7 +10,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useStrategyStore } from '../store/strategyStore'
-import { LogicNode, IndicatorNode, PriceNode, ActionNode, ValueNode } from './nodes/CustomNodes'
+import { LogicNode, IndicatorNode, PriceNode, ActionNode } from './nodes/CustomNodes'
 import NodePalette from './NodePalette'
 import { generateStrategyCode } from '../utils/codeGenerator'
 
@@ -19,19 +19,28 @@ const nodeTypes = {
   indicator: IndicatorNode,
   price: PriceNode,
   action: ActionNode,
-  value: ValueNode,
 }
 
 export default function StrategyBuilder({
   onCodeGenerated,
-  onBacktestResults
+  onBacktestResults,
+  onSwitchTab
 }: {
   onCodeGenerated: (code: string) => void
   onBacktestResults: (results: any) => void
+  onSwitchTab?: (tab: 'builder' | 'backtest' | 'live') => void
 }) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, setStrategyCode, addNode } = useStrategyStore()
   const [showCode, setShowCode] = useState(false)
   const [generatedCode, setGeneratedCode] = useState('')
+  const [showBacktestModal, setShowBacktestModal] = useState(false)
+  const [backtestConfig, setBacktestConfig] = useState({
+    ticker: 'AAPL',
+    startDate: '2023-01-01',
+    endDate: '2024-01-01',
+    cash: 1000000,
+    commission: 0.002
+  })
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
   const { screenToFlowPosition } = useReactFlow()
 
@@ -39,30 +48,36 @@ export default function StrategyBuilder({
   const isValidConnection = useCallback((connection: Connection) => {
     const sourceNode = nodes.find(n => n.id === connection.source)
     const targetNode = nodes.find(n => n.id === connection.target)
-    
+
     if (!sourceNode || !targetNode) return false
 
     // Action nodes can only receive inputs (no outputs)
     if (sourceNode.type === 'action') return false
-    
+
     // Logic nodes must connect to action nodes or other logic nodes
     if (sourceNode.type === 'logic' && targetNode.type !== 'action' && targetNode.type !== 'logic') {
       return false
     }
-    
-    // Indicators and prices output to logic/action nodes
-    if ((sourceNode.type === 'indicator' || sourceNode.type === 'price') && 
-        targetNode.type !== 'logic' && targetNode.type !== 'action') {
+
+    // Indicators and prices can output to:
+    // - Logic nodes
+    // - Action nodes
+    // - Other indicators/prices (for comparison)
+    if ((sourceNode.type === 'indicator' || sourceNode.type === 'price') &&
+      targetNode.type !== 'logic' &&
+      targetNode.type !== 'action' &&
+      targetNode.type !== 'indicator' &&
+      targetNode.type !== 'price') {
       return false
     }
 
     // Prevent duplicate connections to the same handle
     const existingConnection = edges.find(
-      e => e.source === connection.source && 
-           e.target === connection.target && 
-           e.targetHandle === connection.targetHandle
+      e => e.source === connection.source &&
+        e.target === connection.target &&
+        e.targetHandle === connection.targetHandle
     )
-    
+
     return !existingConnection
   }, [nodes, edges])
 
@@ -93,10 +108,10 @@ export default function StrategyBuilder({
       id: `${nodeData.type}_${Date.now()}`,
       type: nodeData.nodeType,
       position,
-      data: { 
-        label: nodeData.label, 
-        type: nodeData.nodeType, 
-        config: nodeData.config 
+      data: {
+        label: nodeData.label,
+        type: nodeData.nodeType,
+        config: nodeData.config
       },
     }
 
@@ -127,36 +142,30 @@ export default function StrategyBuilder({
       return
     }
 
-    const ticker = prompt('Enter ticker symbol:', 'AAPL')
-    if (!ticker) return
-
-    const startDate = prompt('Enter start date (YYYY-MM-DD):', '2023-01-01')
-    if (!startDate) return
-
-    const endDate = prompt('Enter end date (YYYY-MM-DD):', '2024-01-01')
-    if (!endDate) return
-
     try {
       const response = await fetch('http://localhost:8000/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           strategy_code: generatedCode,
-          ticker,
-          start_date: startDate,
-          end_date: endDate,
-          cash: 10000,
-          commission: 0.002,
+          ticker: backtestConfig.ticker,
+          start_date: backtestConfig.startDate,
+          end_date: backtestConfig.endDate,
+          cash: backtestConfig.cash,
+          commission: backtestConfig.commission,
         }),
       })
 
-      const results = await response.json()
+      const data = await response.json()
 
-      if (results.error) {
-        alert('Backtest error: ' + results.error)
+      // Backend returns {success: boolean, results: {...}} or {success: boolean, error: string}
+      if (!data.success || data.error) {
+        alert('Backtest error: ' + (data.error || 'Unknown error'))
       } else {
-        onBacktestResults(results)
-        alert('Backtest complete! Check Backtest Results tab.')
+        // Extract the actual results from the wrapper
+        onBacktestResults(data.results)
+        setShowBacktestModal(false)
+        onSwitchTab?.('backtest')
       }
     } catch (error) {
       alert('Failed to run backtest: ' + error)
@@ -178,7 +187,9 @@ export default function StrategyBuilder({
             onDragOver={onDragOver}
             onDrop={onDrop}
             nodeTypes={nodeTypes}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
             fitView
+            deleteKeyCode={['Backspace', 'Delete']}
             className="h-full w-full"
             proOptions={{ hideAttribution: true }}
           >
@@ -194,7 +205,7 @@ export default function StrategyBuilder({
                 Generate Code
               </button>
               <button
-                onClick={handleRunBacktest}
+                onClick={() => setShowBacktestModal(true)}
                 className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded shadow-lg transition-colors"
                 disabled={!generatedCode}
               >
@@ -223,6 +234,112 @@ export default function StrategyBuilder({
               <pre className="text-xs text-dark-text bg-dark-bg p-3 rounded overflow-x-auto">
                 <code>{generatedCode}</code>
               </pre>
+            </div>
+          )}
+
+          {/* Backtest Configuration Modal */}
+          {showBacktestModal && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-dark-surface border border-dark-border rounded-lg shadow-2xl w-full max-w-md p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-dark-text">Backtest Configuration</h2>
+                  <button
+                    onClick={() => setShowBacktestModal(false)}
+                    className="text-dark-muted hover:text-dark-text transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-dark-text mb-1">Ticker Symbol</label>
+                    <input
+                      type="text"
+                      value={backtestConfig.ticker}
+                      onChange={(e) => setBacktestConfig({ ...backtestConfig, ticker: e.target.value.toUpperCase() })}
+                      className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="AAPL"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-dark-text mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={backtestConfig.startDate}
+                        onChange={(e) => setBacktestConfig({ ...backtestConfig, startDate: e.target.value })}
+                        className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-dark-text mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={backtestConfig.endDate}
+                        onChange={(e) => setBacktestConfig({ ...backtestConfig, endDate: e.target.value })}
+                        className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-dark-text mb-1">
+                      Initial Cash: ${backtestConfig.cash.toLocaleString()}
+                    </label>
+                    <input
+                      type="range"
+                      min="10000"
+                      max="10000000"
+                      step="10000"
+                      value={backtestConfig.cash}
+                      onChange={(e) => setBacktestConfig({ ...backtestConfig, cash: Number(e.target.value) })}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-dark-muted mt-1">
+                      <span>$10K</span>
+                      <span>$10M</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-dark-text mb-1">
+                      Commission: {(backtestConfig.commission * 100).toFixed(2)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="0.01"
+                      step="0.0001"
+                      value={backtestConfig.commission}
+                      onChange={(e) => setBacktestConfig({ ...backtestConfig, commission: Number(e.target.value) })}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-dark-muted mt-1">
+                      <span>0%</span>
+                      <span>1%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => setShowBacktestModal(false)}
+                    className="flex-1 px-4 py-2 bg-dark-border hover:bg-dark-border/70 text-dark-text rounded transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRunBacktest}
+                    className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors font-medium"
+                  >
+                    Run Backtest
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

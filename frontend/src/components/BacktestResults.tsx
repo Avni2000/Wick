@@ -42,13 +42,9 @@ export default function BacktestResults({
       color: '#3b82f6',
     })
 
-    // Convert equity curve data
+    // Set equity curve data (already in correct format from backend)
     if (results.equity_curve && Array.isArray(results.equity_curve)) {
-      const data = results.equity_curve.map((point: any) => ({
-        time: point.date,
-        value: point.equity,
-      }))
-      lineSeries.setData(data)
+      lineSeries.setData(results.equity_curve)
     }
 
     chart.timeScale().fitContent()

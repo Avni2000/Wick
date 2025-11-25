@@ -64,6 +64,13 @@ async def deploy_strategy(config: DeploymentConfig):
     """Deploy a strategy for live/paper trading."""
     deployment_id = f"{config.ticker}_{config.interval}"
     
+    # Stop existing deployment if it exists
+    if deployment_id in active_deployments:
+        trader = active_deployments[deployment_id]
+        trader.stop()
+        journal.update_deployment_status(deployment_id, "stopped")
+        del active_deployments[deployment_id]
+    
     # Create deployment in database
     journal.create_deployment(
         deployment_id=deployment_id,

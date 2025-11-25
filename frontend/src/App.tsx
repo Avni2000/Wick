@@ -48,10 +48,13 @@ export default function App() {
       {/* Main Content */}
       <div className="flex-1 h-full overflow-hidden">
         {activeTab === 'builder' && (
-          <StrategyBuilder
-            onCodeGenerated={setStrategyCode}
-            onBacktestResults={setBacktestResults}
-          />
+          <ReactFlowProvider>
+            <StrategyBuilder
+              onCodeGenerated={setStrategyCode}
+              onBacktestResults={setBacktestResults}
+              onSwitchTab={setActiveTab}
+            />
+          </ReactFlowProvider>
         )}
         {activeTab === 'backtest' && (
           <BacktestResults results={backtestResults} strategyCode={strategyCode} />

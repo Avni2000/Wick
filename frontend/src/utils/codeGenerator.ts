@@ -13,12 +13,21 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
   }
 
   // Build adjacency list for graph traversal (reversed: target -> sources)
+  // Store both regular connections and comparison input connections separately
   const graph = new Map<string, string[]>()
+  const compareInputs = new Map<string, string>() // nodeId -> source node for compare-input handle
+  
   edges.forEach(edge => {
-    if (!graph.has(edge.target)) {
-      graph.set(edge.target, [])
+    // Track compare-input connections separately
+    if (edge.targetHandle === 'compare-input') {
+      compareInputs.set(edge.target, edge.source)
+    } else {
+      // Regular connections for logic flow
+      if (!graph.has(edge.target)) {
+        graph.set(edge.target, [])
+      }
+      graph.get(edge.target)!.push(edge.source)
     }
-    graph.get(edge.target)!.push(edge.source)
   })
 
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
@@ -39,11 +48,10 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
         const compareValue = node.data.compareValue || '0'
         const expression = generateExpression(nodeId)
         
-        // Check if comparing against another node (left input)
-        const parents = graph.get(nodeId) || []
-        if (parents.length > 0) {
-          const compareNode = parents[0]
-          const compareExpr = generateExpression(compareNode)
+        // Check if comparing against another node via compare-input handle
+        const compareSourceId = compareInputs.get(nodeId)
+        if (compareSourceId) {
+          const compareExpr = generateExpression(compareSourceId)
           return `(${expression} ${comparison} ${compareExpr})`
         }
         
@@ -124,35 +132,79 @@ export function generateStrategyCode(nodes: Node[], edges: Edge[]): string {
     }
   }).filter(Boolean)
 
-  // Generate buy/sell conditions
+  // Generate buy/sell conditions with order sizing
   const buyNodes = actionNodes.filter(n => String(n.data.label).toLowerCase().includes('buy'))
   const sellNodes = actionNodes.filter(n => String(n.data.label).toLowerCase().includes('sell'))
 
-  const buyCondition = buyNodes.length > 0
-    ? buyNodes.map(n => generateNodeCondition(n.id)).join(' or ')
-    : 'False'
+  const generateBuyLogic = (node: Node) => {
+    const condition = generateNodeCondition(node.id)
+    const config = node.data.config as any || {}
+    const orderType = config.orderType || 'all'
+    const amount = config.amount || '100000'
 
-  const sellCondition = sellNodes.length > 0
-    ? sellNodes.map(n => generateNodeCondition(n.id)).join(' or ')
-    : 'False'
+    let sizeLogic = ''
+    if (orderType === 'all') {
+      sizeLogic = 'self.buy()'
+    } else if (orderType === 'cash') {
+      sizeLogic = `self.buy(size=${amount} / self.data.Close[-1])`
+    } else if (orderType === 'shares') {
+      sizeLogic = `self.buy(size=${amount})`
+    } else if (orderType === 'percent') {
+      sizeLogic = `self.buy(size=(self.equity * ${amount} / 100) / self.data.Close[-1])`
+    }
+
+    return { condition, sizeLogic }
+  }
+
+  const generateSellLogic = (node: Node) => {
+    const condition = generateNodeCondition(node.id)
+    const config = node.data.config as any || {}
+    const orderType = config.orderType || 'all'
+    const amount = config.amount || '100000'
+
+    let sizeLogic = ''
+    if (orderType === 'all') {
+      sizeLogic = 'self.position.close()'
+    } else if (orderType === 'shares') {
+      sizeLogic = `self.sell(size=min(${amount}, self.position.size))`
+    } else if (orderType === 'percent') {
+      sizeLogic = `self.sell(size=self.position.size * ${amount} / 100)`
+    } else {
+      sizeLogic = 'self.position.close()'
+    }
+
+    return { condition, sizeLogic }
+  }
+
+  const buyLogics = buyNodes.map(generateBuyLogic)
+  const sellLogics = sellNodes.map(generateSellLogic)
+
+  // Generate buy/sell code blocks
+  const buyCode = buyLogics.length > 0 
+    ? buyLogics.map(({ condition, sizeLogic }) => 
+        `        if ${condition}:\n            if not self.position:\n                ${sizeLogic}`
+      ).join('\n        el')
+    : ''
+
+  const sellCode = sellLogics.length > 0
+    ? sellLogics.map(({ condition, sizeLogic }) =>
+        `        if ${condition}:\n            if self.position:\n                ${sizeLogic}`
+      ).join('\n        el')
+    : ''
 
   // Generate final strategy code
   return `from backtesting import Strategy
 import talib
 
-class CustomStrategy(Strategy):
+class WickStrategy(Strategy):
     def init(self):
 ${indicatorInits.join('\n') || '        pass'}
     
     def next(self):
-        # Buy condition
-        if ${buyCondition}:
-            if not self.position:
-                self.buy()
+        # Buy logic
+${buyCode || '        pass'}
         
-        # Sell condition
-        if ${sellCondition}:
-            if self.position:
-                self.position.close()
+        # Sell logic
+${sellCode || '        pass'}
 `
 }

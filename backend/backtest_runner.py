@@ -62,17 +62,31 @@ def run_backtest(ticker: str, start: str, end: str, strategy_code: str,
         bt = Backtest(data, StrategyClass, cash=cash, commission=commission)
         stats = bt.run()
         
-        # Extract equity curve
-        equity_curve = stats._equity_curve['Equity'].tolist()
+        # Extract equity curve with dates
+        equity_curve_df = stats._equity_curve
+        equity_curve = []
+        for idx, equity_value in equity_curve_df['Equity'].items():
+            # Convert timestamp to ISO format string
+            date_str = idx.strftime('%Y-%m-%d') if hasattr(idx, 'strftime') else str(idx)
+            equity_curve.append({
+                'time': date_str,
+                'value': float(equity_value)
+            })
+        
+        # Calculate start and end values
+        start_value = float(equity_curve_df['Equity'].iloc[0]) if len(equity_curve_df) > 0 else cash
+        end_value = float(equity_curve_df['Equity'].iloc[-1]) if len(equity_curve_df) > 0 else cash
         
         # Return formatted results
         return {
-            'return': float(stats['Return [%]']),
+            'return_pct': float(stats['Return [%]']),
             'sharpe_ratio': float(stats['Sharpe Ratio']) if not pd.isna(stats['Sharpe Ratio']) else 0.0,
             'max_drawdown': float(stats['Max. Drawdown [%]']),
             'num_trades': int(stats['# Trades']),
             'win_rate': float(stats['Win Rate [%]']) if not pd.isna(stats['Win Rate [%]']) else 0.0,
-            'equity_curve': equity_curve
+            'equity_curve': equity_curve,
+            'start_value': start_value,
+            'end_value': end_value
         }
         
     except Exception as e:

@@ -49,3 +49,5 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+backend/__pycache__

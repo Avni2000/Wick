@@ -83,18 +83,37 @@ class TradeJournal:
         conn.commit()
         conn.close()
     
+    def deployment_exists(self, deployment_id: str) -> bool:
+        """Check if a deployment exists in the database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM deployments WHERE deployment_id = ?", (deployment_id,))
+        exists = cursor.fetchone() is not None
+        conn.close()
+        return exists
+    
     def create_deployment(self, deployment_id: str, strategy_name: str, 
                          ticker: str, mode: str) -> int:
         """Create a new deployment record"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        cursor.execute("""
-            INSERT INTO deployments (deployment_id, strategy_name, ticker, mode, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (deployment_id, strategy_name, ticker, mode, "running", datetime.now().isoformat()))
+        # If deployment exists, update it instead of inserting
+        if self.deployment_exists(deployment_id):
+            cursor.execute("""
+                UPDATE deployments 
+                SET strategy_name = ?, ticker = ?, mode = ?, status = ?, created_at = ?, stopped_at = NULL
+                WHERE deployment_id = ?
+            """, (strategy_name, ticker, mode, "running", datetime.now().isoformat(), deployment_id))
+            cursor.execute("SELECT id FROM deployments WHERE deployment_id = ?", (deployment_id,))
+            deployment_pk = cursor.fetchone()[0]
+        else:
+            cursor.execute("""
+                INSERT INTO deployments (deployment_id, strategy_name, ticker, mode, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (deployment_id, strategy_name, ticker, mode, "running", datetime.now().isoformat()))
+            deployment_pk = cursor.lastrowid
         
-        deployment_pk = cursor.lastrowid
         conn.commit()
         conn.close()
         return deployment_pk
