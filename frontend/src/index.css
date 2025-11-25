@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-dark-bg: #0a0a0a;
+  --color-dark-surface: #141414;
+  --color-dark-border: #282828;
+  --color-dark-text: #e0e0e0;
+  --color-dark-muted: #a0a0a0;
+}
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #e0e0e0;
+  background-color: #0a0a0a;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* React Flow Overrides */
+.react-flow__minimap {
+  background-color: var(--color-dark-surface) !important;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-dark-border);
+}
+
+.react-flow__minimap-mask {
+  fill: var(--color-dark-border) !important;
+  opacity: 0.5;
+}
+
+.react-flow__controls {
+  background-color: var(--color-dark-surface) !important;
+  border: 1px solid var(--color-dark-border) !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background-color: var(--color-dark-surface) !important;
+  border-bottom: 1px solid var(--color-dark-border) !important;
+  fill: var(--color-dark-text) !important;
+  color: var(--color-dark-text) !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--color-dark-border) !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor !important;
+}

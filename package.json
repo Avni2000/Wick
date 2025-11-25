@@ -1,9 +1,7 @@
 {
-  "name": "wick",
-  "displayName": "Wick",
-  "description": "Wick - Algorithmically Trade from VSCode",
-  "version": "0.0.2",
-  "publisher": "Avni2000",
+  "name": "wick-web",
+  "version": "1.0.0",
+  "description": "Wick - Visual Trading Strategy Builder and Backtesting Platform",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,124 +11,14 @@
     "url": "https://github.com/Avni2000/Wick/issues"
   },
   "homepage": "https://github.com/Avni2000/Wick#readme",
-  "engines": {
-    "vscode": "^1.106.1"
-  },
-  "categories": [
-    "Other"
+  "private": true,
+  "workspaces": [
+    "frontend"
   ],
-  "activationEvents": [
-    "*"
-  ],
-  "main": "./dist/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "wick.showChart",
-        "title": "Wick: Show Chart"
-      },
-      {
-        "command": "wick.showStrategyBuilder",
-        "title": "Wick: Strategy Builder"
-      },
-      {
-        "command": "wick.openSettings",
-        "title": "Wick: Open Settings"
-      },
-      {
-        "command": "wick.openStudioNewWindow",
-        "title": "Wick: Open Studio (New Window)"
-      },
-      {
-        "command": "wick.openStudioCurrentWindow",
-        "title": "Wick: Open Studio (Current Window)"
-      }
-    ],
-    "configuration": {
-      "title": "Wick Trading",
-      "properties": {
-        "wick.strategiesDirectory": {
-          "type": "string",
-          "default": "~/source/repos/strategies",
-          "description": "Directory where trading strategy files are stored"
-        },
-        "wick.pythonPath": {
-          "type": "string",
-          "default": "python3",
-          "description": "Path to Python interpreter for running backtests"
-        },
-        "wick.startInStudioMode": {
-          "type": "boolean",
-          "default": true,
-          "description": "Open Wick Studio in full screen on startup"
-        },
-        "wick.isStudioWindow": {
-          "type": "boolean",
-          "default": false,
-          "description": "Internal setting to identify the Studio Window",
-          "scope": "window"
-        }
-      }
-    },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "wick",
-          "title": "Wick",
-          "icon": "$(graph)"
-        }
-      ]
-    },
-    "views": {
-      "wick": [
-        {
-          "id": "wick-launcher",
-          "name": "Wick",
-          "when": "!config.wick.isStudioWindow"
-        },
-        {
-          "id": "wick-main",
-          "name": "Trading Dashboard",
-          "type": "webview",
-          "when": "config.wick.isStudioWindow"
-        }
-      ]
-    },
-    "viewsWelcome": [
-      {
-        "view": "wick-launcher",
-        "contents": "Welcome to Wick!\n\n[Launch in New Window](command:wick.openStudioNewWindow)\n[Launch in Current Window](command:wick.openStudioCurrentWindow)"
-      }
-    ]
-  },
   "scripts": {
-    "vscode:prepublish": "npm run package",
-    "compile": "npm run check-types && npm run lint && node esbuild.js",
-    "watch": "npm-run-all -p watch:*",
-    "watch:esbuild": "node esbuild.js --watch",
-    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "npm run check-types && npm run lint && node esbuild.js --production",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
-    "check-types": "tsc --noEmit",
-    "lint": "eslint src",
-    "test": "vscode-test",
-    "test:quick": "npm run compile-tests && npm run compile && vscode-test"
-  },
-  "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "@types/vscode": "^1.106.1",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "esbuild": "^0.27.0",
-    "eslint": "^9.39.1",
-    "npm-run-all": "^4.1.5",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.3"
-  },
-  "dependencies": {
-    "lightweight-charts": "^5.0.9"
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && python main.py",
+    "build:frontend": "cd frontend && npm run build",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && pip install -r requirements.txt"
   }
 }
