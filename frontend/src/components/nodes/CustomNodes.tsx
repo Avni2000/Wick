@@ -194,18 +194,18 @@ export const IndicatorNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
         </div>
 
         {/* Grey Body */}
-        <div className="bg-gray-50 px-4 py-3">
+        <div className="bg-gray-900 px-4 py-3">
           {/* Editable configuration */}
           {config && Object.keys(config).length > 0 && (
             <div className="space-y-1.5 mb-2.5">
               {Object.entries(config).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600 capitalize w-20">{key}:</span>
+                  <span className="text-xs text-gray-400 capitalize w-20">{key}:</span>
                   <input
                     type="number"
                     value={value as number}
                     onChange={(e) => updateConfig(key, parseInt(e.target.value) || 0)}
-                    className="bg-white text-gray-900 text-xs px-2 py-1 rounded border border-gray-300 w-16 focus:outline-none focus:ring-1 focus:ring-red-400"
+                    className="bg-gray-800 text-gray-100 text-xs px-2 py-1 rounded border border-gray-700 w-16 focus:outline-none focus:ring-1 focus:ring-red-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
               ))}
@@ -217,7 +217,7 @@ export const IndicatorNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
             <select
               value={comparison}
               onChange={(e) => updateNodeData({ comparison: e.target.value })}
-              className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400 shadow-sm"
+              className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-400 shadow-sm"
             >
               {Object.values(COMPARISON_TYPES).map(op => (
                 <option key={op} value={op}>{getComparisonLabel(op)}</option>
@@ -230,18 +230,18 @@ export const IndicatorNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
               onChange={(e) => !connectedNodeLabel && updateNodeData({ compareValue: e.target.value })}
               placeholder="value"
               disabled={!!connectedNodeLabel}
-              className={`bg-white text-gray-900 text-xs px-2 py-1.5 rounded-md border border-gray-300 w-20 focus:outline-none focus:ring-2 focus:ring-red-400 shadow-sm ${connectedNodeLabel ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              className={`bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded-md border border-gray-700 w-20 focus:outline-none focus:ring-2 focus:ring-red-400 shadow-sm ${connectedNodeLabel ? 'bg-gray-700 cursor-not-allowed' : ''}`}
             />
           </div>
 
           {/* Bar offset and lookback */}
           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-500">Bar:</span>
+              <span className="text-xs text-gray-400">Bar:</span>
               <select
                 value={barOffset}
                 onChange={(e) => updateNodeData({ barOffset: parseInt(e.target.value) })}
-                className="bg-white text-gray-900 text-xs px-1 py-1 rounded border border-gray-300 w-14"
+                className="bg-gray-800 text-gray-100 text-xs px-1 py-1 rounded border border-gray-700 w-14"
               >
                 <option value={0}>Now</option>
                 <option value={1}>-1</option>
@@ -250,11 +250,11 @@ export const IndicatorNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
               </select>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-500">Within:</span>
+              <span className="text-xs text-gray-400">Within:</span>
               <select
                 value={lookback}
                 onChange={(e) => updateNodeData({ lookback: parseInt(e.target.value) })}
-                className="bg-white text-gray-900 text-xs px-1 py-1 rounded border border-gray-300 w-14"
+                className="bg-gray-800 text-gray-100 text-xs px-1 py-1 rounded border border-gray-700 w-14"
                 title={formatDescription(TOOLTIP_DESCRIPTIONS['within']).replace(/\n/g, '&#10;')}
               >
                 <option value={0}>-</option>
@@ -349,13 +349,13 @@ export const PriceNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
         </div>
 
         {/* Grey Body */}
-        <div className="bg-gray-50 px-4 py-3">
+        <div className="bg-gray-900 px-4 py-3">
           {/* Built-in comparison */}
           <div className="flex items-center gap-2">
             <select
               value={comparison}
               onChange={(e) => updateNodeData({ comparison: e.target.value })}
-              className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-400 shadow-sm"
+              className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-green-400 shadow-sm"
             >
               {Object.values(COMPARISON_TYPES).map(op => (
                 <option key={op} value={op}>{getComparisonLabel(op)}</option>
@@ -368,18 +368,18 @@ export const PriceNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
               onChange={(e) => !connectedNodeLabel && updateNodeData({ compareValue: e.target.value })}
               placeholder="value"
               disabled={!!connectedNodeLabel}
-              className={`bg-white text-gray-900 text-xs px-2 py-1.5 rounded-md border border-gray-300 w-20 focus:outline-none focus:ring-2 focus:ring-green-400 shadow-sm ${connectedNodeLabel ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              className={`bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded-md border border-gray-700 w-20 focus:outline-none focus:ring-2 focus:ring-green-400 shadow-sm ${connectedNodeLabel ? 'bg-gray-700 cursor-not-allowed' : ''}`}
             />
           </div>
 
           {/* Bar offset and lookback */}
           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-500">Bar:</span>
+              <span className="text-xs text-gray-400">Bar:</span>
               <select
                 value={barOffset}
                 onChange={(e) => updateNodeData({ barOffset: parseInt(e.target.value) })}
-                className="bg-white text-gray-900 text-xs px-1 py-1 rounded border border-gray-300 w-14"
+                className="bg-gray-800 text-gray-100 text-xs px-1 py-1 rounded border border-gray-700 w-14"
               >
                 <option value={0}>Now</option>
                 <option value={1}>-1</option>
@@ -388,11 +388,11 @@ export const PriceNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
               </select>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-500">Within:</span>
+              <span className="text-xs text-gray-400">Within:</span>
               <select
                 value={lookback}
                 onChange={(e) => updateNodeData({ lookback: parseInt(e.target.value) })}
-                className="bg-white text-gray-900 text-xs px-1 py-1 rounded border border-gray-300 w-14"
+                className="bg-gray-800 text-gray-100 text-xs px-1 py-1 rounded border border-gray-700 w-14"
                 title={formatDescription(TOOLTIP_DESCRIPTIONS['within']).replace(/\n/g, '&#10;')}
               >
                 <option value={0}>-</option>
@@ -457,7 +457,7 @@ export const ActionNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
         </div>
 
         {/* Grey Body */}
-        <div className="bg-gray-50 px-4 py-3 space-y-2">
+        <div className="bg-gray-900 px-4 py-3 space-y-2">
           <div className="flex flex-col gap-2">
             <select
               value={orderType}
@@ -466,7 +466,7 @@ export const ActionNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
                 setOrderType(type)
                 updateConfig(type, amount)
               }}
-              className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm w-full"
+              className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm w-full"
             >
               <option value="all">{isBuy ? 'All Cash' : 'All Shares'}</option>
               <option value="cash">Fixed Cash Amount</option>
@@ -483,14 +483,14 @@ export const ActionNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
                     setAmount(e.target.value)
                     updateConfig(orderType, e.target.value)
                   }}
-                  className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm flex-1"
+                  className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder={
                     orderType === 'cash' ? '100000' :
                       orderType === 'shares' ? '100' :
                         '50'
                   }
                 />
-                <span className="text-xs text-gray-600">
+                <span className="text-xs text-gray-400">
                   {orderType === 'cash' ? '$' :
                     orderType === 'shares' ? 'sh' :
                       '%'}
@@ -523,12 +523,12 @@ export const ValueNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
         </div>
 
         {/* Light Grey Body */}
-        <div className="bg-gray-50 px-4 py-3">
+        <div className="bg-gray-900 px-4 py-3">
           <input
             type="number"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="bg-white text-gray-900 text-sm px-2 py-1.5 rounded-md border border-gray-300 w-full focus:outline-none focus:ring-2 focus:ring-gray-400 shadow-sm"
+            className="bg-gray-800 text-gray-100 text-sm px-2 py-1.5 rounded-md border border-gray-700 w-full focus:outline-none focus:ring-2 focus:ring-gray-400 shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             placeholder="Enter value"
           />
         </div>
@@ -582,15 +582,15 @@ export const ExitNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
         </div>
 
         {/* Grey Body */}
-        <div className="bg-gray-50 px-4 py-3 space-y-2">
+        <div className="bg-gray-900 px-4 py-3 space-y-2">
           {(isStopLoss || isTakeProfit) && (
             <>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-600 w-12">Type:</span>
+                <span className="text-xs text-gray-400 w-12">Type:</span>
                 <select
                   value={config.type || 'percent'}
                   onChange={(e) => updateConfig('type', e.target.value)}
-                  className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded border border-gray-300 flex-1"
+                  className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded border border-gray-700 flex-1"
                 >
                   <option value="percent">Percentage</option>
                   <option value="fixed">Fixed Price</option>
@@ -598,26 +598,26 @@ export const ExitNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-600 w-12">Value:</span>
+                <span className="text-xs text-gray-400 w-12">Value:</span>
                 <input
                   type="number"
                   value={config.value || (isStopLoss ? 2 : 5)}
                   onChange={(e) => updateConfig('value', parseFloat(e.target.value))}
-                  className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded border border-gray-300 flex-1"
+                  className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded border border-gray-700 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   step="0.1"
                 />
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-400">
                   {config.type === 'percent' ? '%' : config.type === 'atr' ? 'x ATR' : '$'}
                 </span>
               </div>
               {config.type === 'atr' && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600 w-12">Period:</span>
+                  <span className="text-xs text-gray-400 w-12">Period:</span>
                   <input
                     type="number"
                     value={config.period || 14}
                     onChange={(e) => updateConfig('period', parseInt(e.target.value))}
-                    className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded border border-gray-300 flex-1"
+                    className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded border border-gray-700 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
               )}
@@ -627,11 +627,11 @@ export const ExitNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
           {isTrailingStop && (
             <>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-600 w-12">Type:</span>
+                <span className="text-xs text-gray-400 w-12">Type:</span>
                 <select
                   value={config.type || 'atr'}
                   onChange={(e) => updateConfig('type', e.target.value)}
-                  className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded border border-gray-300 flex-1"
+                  className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded border border-gray-700 flex-1"
                 >
                   <option value="percent">Percentage</option>
                   <option value="atr">ATR Multiple</option>
@@ -640,37 +640,37 @@ export const ExitNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
               {config.type === 'atr' ? (
                 <>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600 w-12">Multi:</span>
+                    <span className="text-xs text-gray-400 w-12">Multi:</span>
                     <input
                       type="number"
                       value={config.multiplier || 2}
                       onChange={(e) => updateConfig('multiplier', parseFloat(e.target.value))}
-                      className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded border border-gray-300 flex-1"
+                      className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded border border-gray-700 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       step="0.1"
                     />
-                    <span className="text-xs text-gray-500">x ATR</span>
+                    <span className="text-xs text-gray-400">x ATR</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600 w-12">Period:</span>
+                    <span className="text-xs text-gray-400 w-12">Period:</span>
                     <input
                       type="number"
                       value={config.period || 14}
                       onChange={(e) => updateConfig('period', parseInt(e.target.value))}
-                      className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded border border-gray-300 flex-1"
+                      className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded border border-gray-700 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                 </>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600 w-12">Value:</span>
+                  <span className="text-xs text-gray-400 w-12">Value:</span>
                   <input
                     type="number"
                     value={config.value || 2}
                     onChange={(e) => updateConfig('value', parseFloat(e.target.value))}
-                    className="bg-white text-gray-900 text-xs px-2 py-1.5 rounded border border-gray-300 flex-1"
+                    className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded border border-gray-700 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     step="0.1"
                   />
-                  <span className="text-xs text-gray-500">%</span>
+                  <span className="text-xs text-gray-400">%</span>
                 </div>
               )}
             </>
