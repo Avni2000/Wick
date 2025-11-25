@@ -10,15 +10,17 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useStrategyStore } from '../store/strategyStore'
-import { LogicNode, IndicatorNode, PriceNode, ActionNode } from './nodes/CustomNodes'
+import { LogicNode, IndicatorNode, PriceNode, ActionNode, ExitNode } from './nodes/CustomNodes'
 import NodePalette from './NodePalette'
 import { generateStrategyCode } from '../utils/codeGenerator'
+import { InfoPanelProvider } from '../contexts/InfoPanelContext'
 
 const nodeTypes = {
   logic: LogicNode,
   indicator: IndicatorNode,
   price: PriceNode,
   action: ActionNode,
+  exit: ExitNode,
 }
 
 export default function StrategyBuilder({
@@ -34,6 +36,8 @@ export default function StrategyBuilder({
   const [showCode, setShowCode] = useState(false)
   const [generatedCode, setGeneratedCode] = useState('')
   const [showBacktestModal, setShowBacktestModal] = useState(false)
+  const [showInfoPanel, setShowInfoPanel] = useState(false)
+  const [infoPanelContent, setInfoPanelContent] = useState({ title: '', description: '' })
   const [backtestConfig, setBacktestConfig] = useState({
     ticker: 'AAPL',
     startDate: '2023-01-01',
@@ -43,6 +47,22 @@ export default function StrategyBuilder({
   })
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
   const { screenToFlowPosition } = useReactFlow()
+  const hideInfoTimeout = useRef<number | null>(null)
+
+  const handleShowInfo = (title: string, description: string) => {
+    if (hideInfoTimeout.current) {
+      clearTimeout(hideInfoTimeout.current)
+      hideInfoTimeout.current = null
+    }
+    setInfoPanelContent({ title, description })
+    setShowInfoPanel(true)
+  }
+
+  const handleHideInfo = () => {
+    hideInfoTimeout.current = window.setTimeout(() => {
+      setShowInfoPanel(false)
+    }, 200) // 200ms delay to allow moving mouse to panel
+  }
 
   // Connection validation - prevent invalid connections
   const isValidConnection = useCallback((connection: Connection) => {
@@ -53,6 +73,14 @@ export default function StrategyBuilder({
 
     // Action nodes can only receive inputs (no outputs)
     if (sourceNode.type === 'action') return false
+
+    // Action nodes can only have ONE input connection
+    if (targetNode.type === 'action') {
+      const existingInputs = edges.filter(e => e.target === connection.target)
+      if (existingInputs.length > 0) {
+        return false // Already has an input, reject new connection
+      }
+    }
 
     // Logic nodes must connect to action nodes or other logic nodes
     if (sourceNode.type === 'logic' && targetNode.type !== 'action' && targetNode.type !== 'logic') {
@@ -178,47 +206,81 @@ export default function StrategyBuilder({
 
       <div ref={reactFlowWrapper} className="flex-1 relative min-h-0 bg-dark-bg">
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={handleConnect}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
-            nodeTypes={nodeTypes}
-            defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
-            fitView
-            deleteKeyCode={['Backspace', 'Delete']}
-            className="h-full w-full"
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background />
-            <Controls />
-            <MiniMap className="bg-dark-surface" nodeColor="#374151" />
+          <InfoPanelProvider value={{
+            showInfo: handleShowInfo,
+            hideInfo: handleHideInfo
+          }}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={handleConnect}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+              nodeTypes={nodeTypes}
+              defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+              fitView
+              deleteKeyCode={['Backspace', 'Delete']}
+              edgesReconnectable={true}
+              reconnectRadius={20}
+              defaultEdgeOptions={{
+                type: 'smoothstep',
+                animated: true,
+                style: { stroke: '#6b7280', strokeWidth: 2 },
+              }}
+              className="h-full w-full"
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background />
+              <Controls />
+              <MiniMap className="bg-dark-surface" nodeColor="#374151" />
 
-            <Panel position="top-right" className="space-x-2">
-              <button
-                onClick={handleGenerateCode}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-lg transition-colors"
-              >
-                Generate Code
-              </button>
-              <button
-                onClick={() => setShowBacktestModal(true)}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded shadow-lg transition-colors"
-                disabled={!generatedCode}
-              >
-                Run Backtest
-              </button>
-              <button
-                onClick={() => setShowCode(!showCode)}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded shadow-lg transition-colors"
-              >
-                {showCode ? 'Hide' : 'Show'} Code
-              </button>
-            </Panel>
-          </ReactFlow>
+              <Panel position="top-right" className="space-x-2">
+                <button
+                  onClick={handleGenerateCode}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-lg transition-colors"
+                >
+                  Generate Code
+                </button>
+                <button
+                  onClick={() => setShowBacktestModal(true)}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded shadow-lg transition-colors"
+                  disabled={!generatedCode}
+                >
+                  Run Backtest
+                </button>
+                <button
+                  onClick={() => setShowCode(!showCode)}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded shadow-lg transition-colors"
+                >
+                  {showCode ? 'Hide' : 'Show'} Code
+                </button>
+              </Panel>
+
+              {/* Info Panel */}
+              {showInfoPanel && (
+                <div className="absolute top-16 right-4 z-50">
+                  <div
+                    className="bg-dark-surface border border-dark-border rounded-lg p-4 w-80 shadow-xl"
+                    onMouseEnter={() => {
+                      if (hideInfoTimeout.current) {
+                        clearTimeout(hideInfoTimeout.current)
+                        hideInfoTimeout.current = null
+                      }
+                    }}
+                    onMouseLeave={handleHideInfo}
+                  >
+                    <h3 className="text-sm font-semibold text-dark-text mb-2">{infoPanelContent.title}</h3>
+                    <div 
+                      className="text-xs text-dark-muted leading-relaxed whitespace-pre-line"
+                      dangerouslySetInnerHTML={{ __html: infoPanelContent.description }}
+                    />
+                  </div>
+                </div>
+              )}
+            </ReactFlow>
+          </InfoPanelProvider>
 
           {showCode && generatedCode && (
             <div className="absolute bottom-4 left-4 right-4 bg-dark-surface border border-dark-border rounded-lg p-4 max-h-96 overflow-auto">

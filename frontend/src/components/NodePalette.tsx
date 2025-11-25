@@ -1,11 +1,11 @@
 import { useStrategyStore } from '../store/strategyStore'
 import { type Node } from '@xyflow/react'
-import { LOGIC_TYPES, INDICATOR_TYPES, PRICE_TYPES, ACTION_TYPES, NODE_CONFIGS } from '../types/nodes'
+import { LOGIC_TYPES, INDICATOR_TYPES, PRICE_TYPES, ACTION_TYPES, EXIT_TYPES, NODE_CONFIGS } from '../types/nodes'
 
 export default function NodePalette() {
   const addNode = useStrategyStore((state) => state.addNode)
 
-  const createNode = (type: string, label: string, nodeType: 'logic' | 'indicator' | 'price' | 'action', config?: any, position?: { x: number; y: number }): Node => {
+  const createNode = (type: string, label: string, nodeType: 'logic' | 'indicator' | 'price' | 'action' | 'exit', config?: any, position?: { x: number; y: number }): Node => {
     const id = `${type}_${Date.now()}`
     return {
       id,
@@ -15,7 +15,7 @@ export default function NodePalette() {
     }
   }
 
-  const onDragStart = (event: React.DragEvent, node: { type: string; label: string; nodeType: 'logic' | 'indicator' | 'price' | 'action'; config?: any }) => {
+  const onDragStart = (event: React.DragEvent, node: { type: string; label: string; nodeType: 'logic' | 'indicator' | 'price' | 'action' | 'exit'; config?: any }) => {
     event.dataTransfer.setData('application/reactflow', JSON.stringify(node))
     event.dataTransfer.effectAllowed = 'move'
   }
@@ -26,6 +26,7 @@ export default function NodePalette() {
       nodes: [
         { type: LOGIC_TYPES.AND, label: 'AND', nodeType: 'logic' as const },
         { type: LOGIC_TYPES.OR, label: 'OR', nodeType: 'logic' as const },
+        { type: LOGIC_TYPES.NOT, label: 'NOT', nodeType: 'logic' as const },
       ],
     },
     {
@@ -36,15 +37,19 @@ export default function NodePalette() {
         { type: INDICATOR_TYPES.EMA, label: 'EMA', nodeType: 'indicator' as const, config: NODE_CONFIGS.ema },
         { type: INDICATOR_TYPES.MACD, label: 'MACD', nodeType: 'indicator' as const, config: NODE_CONFIGS.macd },
         { type: INDICATOR_TYPES.BB, label: 'Bollinger Bands', nodeType: 'indicator' as const, config: NODE_CONFIGS.bollinger_bands },
+        { type: INDICATOR_TYPES.ATR, label: 'ATR', nodeType: 'indicator' as const, config: NODE_CONFIGS.atr },
+        { type: INDICATOR_TYPES.STOCHASTIC, label: 'Stochastic', nodeType: 'indicator' as const, config: NODE_CONFIGS.stochastic },
+        { type: INDICATOR_TYPES.ADX, label: 'ADX', nodeType: 'indicator' as const, config: NODE_CONFIGS.adx },
       ],
     },
     {
-      name: 'Price',
+      name: 'Price & Volume',
       nodes: [
         { type: PRICE_TYPES.OPEN, label: 'Open', nodeType: 'price' as const },
         { type: PRICE_TYPES.HIGH, label: 'High', nodeType: 'price' as const },
         { type: PRICE_TYPES.LOW, label: 'Low', nodeType: 'price' as const },
         { type: PRICE_TYPES.CLOSE, label: 'Close', nodeType: 'price' as const },
+        { type: PRICE_TYPES.VOLUME, label: 'Volume', nodeType: 'price' as const },
       ],
     },
     {
@@ -52,6 +57,14 @@ export default function NodePalette() {
       nodes: [
         { type: ACTION_TYPES.BUY, label: 'Buy', nodeType: 'action' as const, config: { amount: 'All Cash' } },
         { type: ACTION_TYPES.SELL, label: 'Sell', nodeType: 'action' as const, config: { amount: 'All Shares' } },
+      ],
+    },
+    {
+      name: 'Risk Management',
+      nodes: [
+        { type: EXIT_TYPES.STOP_LOSS, label: 'Stop Loss', nodeType: 'exit' as const, config: NODE_CONFIGS.stop_loss },
+        { type: EXIT_TYPES.TAKE_PROFIT, label: 'Take Profit', nodeType: 'exit' as const, config: NODE_CONFIGS.take_profit },
+        { type: EXIT_TYPES.TRAILING_STOP, label: 'Trailing Stop', nodeType: 'exit' as const, config: NODE_CONFIGS.trailing_stop },
       ],
     },
   ]
