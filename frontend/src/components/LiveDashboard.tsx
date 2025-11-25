@@ -33,7 +33,7 @@ export default function LiveDashboard({
 }) {
   const [isDeployed, setIsDeployed] = useState(false)
   const [deploymentId, setDeploymentId] = useState<string | null>(null)
-  const [ticker, setTicker] = useState('AAPL')
+  const [ticker, setTicker] = useState('RKLB')
   const [interval, setInterval] = useState('1min')
   const [position, setPosition] = useState<Position | null>(null)
   const [signals, setSignals] = useState<Signal[]>([])
@@ -76,13 +76,13 @@ export default function LiveDashboard({
         setIsDeployed(true)
         setActiveDeployment(result)
         connectWebSocket(result.deployment_id)
-        addLog(`✅ Deployed strategy for ${ticker}`)
+        addLog(`Deployed strategy for ${ticker}`)
       } else {
         alert('Deployment failed: ' + (result.error || 'Unknown error'))
       }
     } catch (error) {
       alert('Failed to deploy: ' + error)
-      addLog(`❌ Deployment failed: ${error}`)
+      addLog(`Deployment failed: ${error}`)
     }
   }
 
@@ -102,10 +102,10 @@ export default function LiveDashboard({
         wsRef.current.close()
       }
       
-      addLog(`⏹️ Stopped deployment`)
+      addLog(`Stopped deployment`)
     } catch (error) {
       alert('Failed to stop deployment: ' + error)
-      addLog(`❌ Stop failed: ${error}`)
+      addLog(`Stop failed: ${error}`)
     }
   }
 
@@ -113,7 +113,7 @@ export default function LiveDashboard({
     const ws = new WebSocket(`ws://localhost:8000/ws/${depId}`)
     
     ws.onopen = () => {
-      addLog('🔌 WebSocket connected')
+      addLog('WebSocket connected')
     }
 
     ws.onmessage = (event) => {
@@ -127,7 +127,7 @@ export default function LiveDashboard({
             price: data.price,
             message: `${data.signal} signal at $${data.price}`,
           })
-          addLog(`📊 Signal: ${data.signal} at $${data.price}`)
+          addLog(`Signal: ${data.signal} at $${data.price}`)
           break
 
         case 'order':
@@ -139,7 +139,7 @@ export default function LiveDashboard({
             price: data.price,
             status: data.status,
           })
-          addLog(`📝 Order: ${data.order_type} ${data.shares} shares at $${data.price}`)
+          addLog(`Order: ${data.order_type} ${data.shares} shares at $${data.price}`)
           break
 
         case 'position':
@@ -154,7 +154,7 @@ export default function LiveDashboard({
           break
 
         case 'error':
-          addLog(`❌ Error: ${data.message}`)
+          addLog(`Error: ${data.message}`)
           break
 
         default:
@@ -163,11 +163,11 @@ export default function LiveDashboard({
     }
 
     ws.onerror = (error) => {
-      addLog(`❌ WebSocket error: ${error}`)
+      addLog(`WebSocket error: ${error}`)
     }
 
     ws.onclose = () => {
-      addLog('🔌 WebSocket disconnected')
+      addLog('WebSocket disconnected')
     }
 
     wsRef.current = ws
@@ -203,7 +203,7 @@ export default function LiveDashboard({
                   value={ticker}
                   onChange={(e) => setTicker(e.target.value.toUpperCase())}
                   className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded text-dark-text"
-                  placeholder="AAPL"
+                  placeholder="RKLB"
                 />
               </div>
               <div>
