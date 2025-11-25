@@ -40,8 +40,8 @@ export default function StrategyBuilder({
   const [infoPanelContent, setInfoPanelContent] = useState({ title: '', description: '' })
   const [backtestConfig, setBacktestConfig] = useState({
     ticker: 'AAPL',
-    startDate: '2023-01-01',
-    endDate: '2024-01-01',
+    startDate: '2020-01-01',
+    endDate: new Date().toISOString().split('T')[0],
     cash: 1000000,
     commission: 0.002
   })
