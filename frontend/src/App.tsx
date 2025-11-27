@@ -3,11 +3,13 @@ import { ReactFlowProvider } from '@xyflow/react'
 import StrategyBuilder from './components/StrategyBuilder'
 import BacktestResults from './components/BacktestResults'
 import LiveDashboard from './components/LiveDashboard'
+import WickChart from './components/WickChart'
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'builder' | 'backtest' | 'live'>('builder')
+  const [activeTab, setActiveTab] = useState<'builder' | 'backtest' | 'live' | 'chart'>('builder')
   const [strategyCode, setStrategyCode] = useState('')
   const [backtestResults, setBacktestResults] = useState(null)
+  const [backtestTicker, setBacktestTicker] = useState('AAPL')
 
   return (
     <div className="flex h-screen bg-dark-bg text-dark-text">
@@ -43,6 +45,16 @@ export default function App() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
         </button>
+        <button
+          onClick={() => setActiveTab('chart')}
+          className={`w-10 h-10 rounded flex items-center justify-center ${activeTab === 'chart' ? 'bg-dark-border' : 'hover:bg-dark-border/50'
+            }`}
+          title="Chart"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+          </svg>
+        </button>
       </div>
 
       {/* Main Content */}
@@ -51,16 +63,27 @@ export default function App() {
           <ReactFlowProvider>
             <StrategyBuilder
               onCodeGenerated={setStrategyCode}
-              onBacktestResults={setBacktestResults}
+              onBacktestResults={(results) => {
+                setBacktestResults(results)
+              }}
+              onBacktestTicker={setBacktestTicker}
               onSwitchTab={setActiveTab}
             />
           </ReactFlowProvider>
         )}
         {activeTab === 'backtest' && (
-          <BacktestResults results={backtestResults} strategyCode={strategyCode} />
+          <BacktestResults 
+            results={backtestResults} 
+            strategyCode={strategyCode}
+            ticker={backtestTicker}
+            onPlotOnChart={() => setActiveTab('chart')}
+          />
         )}
         {activeTab === 'live' && (
           <LiveDashboard strategyCode={strategyCode} />
+        )}
+        {activeTab === 'chart' && (
+          <WickChart />
         )}
       </div>
     </div>

@@ -8,10 +8,63 @@ from backtesting import Backtest, Strategy
 import yfinance as yf
 import pandas as pd
 import numpy as np
+from datetime import datetime
+
+# Interval options with their constraints (must match WickChart.tsx INTERVAL_OPTIONS)
+INTERVAL_CONFIG = [
+    {'value': '1m', 'maxPeriod': '7d', 'days': 7},
+    {'value': '2m', 'maxPeriod': '60d', 'days': 60},
+    {'value': '5m', 'maxPeriod': '60d', 'days': 60},
+    {'value': '15m', 'maxPeriod': '60d', 'days': 60},
+    {'value': '30m', 'maxPeriod': '60d', 'days': 60},
+    {'value': '1h', 'maxPeriod': '730d', 'days': 730},
+    {'value': '1d', 'maxPeriod': 'max', 'days': float('inf')},
+    {'value': '1wk', 'maxPeriod': 'max', 'days': float('inf')},
+    {'value': '1mo', 'maxPeriod': 'max', 'days': float('inf')},
+]
+
+
+def get_optimal_interval(start: str, end: str, target_interval: str = None) -> str:
+    """
+    Select the optimal interval for the given date range to minimize granularity.
+    
+    Args:
+        start: Start date (YYYY-MM-DD)
+        end: End date (YYYY-MM-DD)
+        target_interval: If specified, use this interval if it supports the range
+    
+    Returns:
+        The optimal interval string (e.g., '1h', '1d', '1wk')
+    """
+    try:
+        start_date = datetime.strptime(start, '%Y-%m-%d')
+        end_date = datetime.strptime(end, '%Y-%m-%d')
+        days_diff = (end_date - start_date).days
+    except ValueError:
+        return '1d'  # Default to daily if parsing fails
+    
+    # If target interval is specified, verify it supports the range
+    if target_interval:
+        for config in INTERVAL_CONFIG:
+            if config['value'] == target_interval:
+                if days_diff <= config['days']:
+                    return target_interval
+                break
+    
+    # Find the interval with finest granularity that supports the date range
+    # Iterate through intervals from finest to coarsest
+    best_interval = '1mo'  # Default to monthly
+    for config in INTERVAL_CONFIG:
+        if days_diff <= config['days']:
+            best_interval = config['value']
+            break  # Found the finest interval that fits
+    
+    return best_interval
 
 
 def run_backtest(ticker: str, start: str, end: str, strategy_code: str, 
-                 cash: float = 1000000.0, commission: float = 0.002) -> dict:
+                 cash: float = 1000000.0, commission: float = 0.002, 
+                 interval: str = None) -> dict:
     """
     Run a backtest with the given parameters.
     
@@ -22,13 +75,21 @@ def run_backtest(ticker: str, start: str, end: str, strategy_code: str,
         strategy_code: Python strategy code to execute
         cash: Initial cash amount
         commission: Commission percentage (0.002 = 0.2%)
+        interval: Data interval (e.g., '1h', '1d', '1wk'). If None, optimal is selected.
     
     Returns:
         Dictionary with backtest results
     """
     try:
-        # Download data
-        data = yf.download(ticker, start=start, end=end, progress=False)
+        # Get optimal interval if not specified
+        if interval is None:
+            interval = get_optimal_interval(start, end)
+        else:
+            # Verify requested interval supports the date range
+            interval = get_optimal_interval(start, end, target_interval=interval)
+        
+        # Download data with the selected interval
+        data = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
         
         if data.empty:
             raise ValueError(f"No data available for {ticker} between {start} and {end}")
@@ -62,6 +123,36 @@ def run_backtest(ticker: str, start: str, end: str, strategy_code: str,
         bt = Backtest(data, StrategyClass, cash=cash, commission=commission)
         stats = bt.run()
         
+        # Extract trade details
+        trades = []
+        if hasattr(stats, '_trades') and stats._trades is not None and len(stats._trades) > 0:
+            for _, trade in stats._trades.iterrows():
+                entry_time = trade['EntryTime']
+                exit_time = trade['ExitTime']
+                
+                # Format timestamps
+                entry_str = entry_time.strftime('%Y-%m-%d %H:%M') if hasattr(entry_time, 'strftime') else str(entry_time)
+                exit_str = exit_time.strftime('%Y-%m-%d %H:%M') if hasattr(exit_time, 'strftime') else str(exit_time)
+                
+                # Convert to unix timestamps for chart plotting
+                entry_unix = int(entry_time.timestamp()) if hasattr(entry_time, 'timestamp') else 0
+                exit_unix = int(exit_time.timestamp()) if hasattr(exit_time, 'timestamp') else 0
+                
+                trades.append({
+                    'entry_time': entry_str,
+                    'entry_unix': entry_unix,
+                    'exit_time': exit_str,
+                    'exit_unix': exit_unix,
+                    'entry_price': float(trade['EntryPrice']),
+                    'exit_price': float(trade['ExitPrice']),
+                    'size': int(trade['Size']),
+                    'pnl': float(trade['PnL']),
+                    'return_pct': float(trade['ReturnPct']) * 100,
+                    'entry_bar': int(trade['EntryBar']),
+                    'exit_bar': int(trade['ExitBar']),
+                    'duration': str(trade['Duration']) if pd.notna(trade['Duration']) else 'N/A'
+                })
+
         # Extract equity curve with dates
         equity_curve_df = stats._equity_curve
         equity_curve = []
@@ -86,7 +177,9 @@ def run_backtest(ticker: str, start: str, end: str, strategy_code: str,
             'win_rate': float(stats['Win Rate [%]']) if not pd.isna(stats['Win Rate [%]']) else 0.0,
             'equity_curve': equity_curve,
             'start_value': start_value,
-            'end_value': end_value
+            'end_value': end_value,
+            'trades': trades,
+            'interval': interval  # Include the interval used for reference
         }
         
     except Exception as e:

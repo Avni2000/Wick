@@ -36,6 +36,7 @@ export const PRICE_TYPES = {
   LOW: 'low',
   CLOSE: 'close',
   VOLUME: 'volume',
+  INTRADAY_PRICE: 'intraday_price',
 } as const
 
 // Action types
@@ -80,4 +81,5 @@ export const NODE_CONFIGS = {
   stop_loss: { type: 'percent', value: 2 },
   take_profit: { type: 'percent', value: 5 },
   trailing_stop: { type: 'atr', multiplier: 2, period: 14 },
+  intraday_price: { interval: '1h' },
 }

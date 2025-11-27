@@ -5,7 +5,7 @@ import { LOGIC_TYPES, INDICATOR_TYPES, PRICE_TYPES, ACTION_TYPES, EXIT_TYPES, NO
 export default function NodePalette() {
   const addNode = useStrategyStore((state) => state.addNode)
 
-  const createNode = (type: string, label: string, nodeType: 'logic' | 'indicator' | 'price' | 'action' | 'exit', config?: any, position?: { x: number; y: number }): Node => {
+  const createNode = (type: string, label: string, nodeType: 'logic' | 'indicator' | 'price' | 'intraday_price' | 'action' | 'exit', config?: any, position?: { x: number; y: number }): Node => {
     const id = `${type}_${Date.now()}`
     return {
       id,
@@ -15,7 +15,7 @@ export default function NodePalette() {
     }
   }
 
-  const onDragStart = (event: React.DragEvent, node: { type: string; label: string; nodeType: 'logic' | 'indicator' | 'price' | 'action' | 'exit'; config?: any }) => {
+  const onDragStart = (event: React.DragEvent, node: { type: string; label: string; nodeType: 'logic' | 'indicator' | 'price' | 'intraday_price' | 'action' | 'exit'; config?: any }) => {
     event.dataTransfer.setData('application/reactflow', JSON.stringify(node))
     event.dataTransfer.effectAllowed = 'move'
   }
@@ -50,6 +50,7 @@ export default function NodePalette() {
         { type: PRICE_TYPES.LOW, label: 'Low', nodeType: 'price' as const },
         { type: PRICE_TYPES.CLOSE, label: 'Close', nodeType: 'price' as const },
         { type: PRICE_TYPES.VOLUME, label: 'Volume', nodeType: 'price' as const },
+        { type: PRICE_TYPES.INTRADAY_PRICE, label: 'Intraday Price', nodeType: 'intraday_price' as const, config: NODE_CONFIGS.intraday_price },
       ],
     },
     {

@@ -1,12 +1,37 @@
 import { create } from 'zustand'
 import { type Node, type Edge, addEdge, type Connection, applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange } from '@xyflow/react'
 
+// Trade marker interface for chart plotting
+export interface TradeMarker {
+  entry_time: string
+  entry_unix: number
+  exit_time: string
+  exit_unix: number
+  entry_price: number
+  exit_price: number
+  size: number
+  pnl: number
+  return_pct: number
+  entry_bar: number
+  exit_bar: number
+  duration: string
+  conditions?: string[] // Strategy conditions that triggered this trade
+}
+
+export interface BacktestPlotData {
+  ticker: string
+  trades: TradeMarker[]
+  strategyDescription: string
+  interval: string
+}
+
 interface StrategyState {
   nodes: Node[]
   edges: Edge[]
   strategyCode: string
   backtestResults: any
   activeDeployment: any
+  backtestPlotData: BacktestPlotData | null  // For plotting on chart
   
   // Actions
   setNodes: (nodes: Node[]) => void
@@ -18,6 +43,7 @@ interface StrategyState {
   setStrategyCode: (code: string) => void
   setBacktestResults: (results: any) => void
   setActiveDeployment: (deployment: any) => void
+  setBacktestPlotData: (data: BacktestPlotData | null) => void
   resetFlow: () => void
 }
 
@@ -299,6 +325,7 @@ export const useStrategyStore = create<StrategyState>((set, get) => ({
   strategyCode: '',
   backtestResults: null,
   activeDeployment: null,
+  backtestPlotData: null,
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -330,11 +357,13 @@ export const useStrategyStore = create<StrategyState>((set, get) => ({
   setStrategyCode: (code) => set({ strategyCode: code }),
   setBacktestResults: (results) => set({ backtestResults: results }),
   setActiveDeployment: (deployment) => set({ activeDeployment: deployment }),
+  setBacktestPlotData: (data) => set({ backtestPlotData: data }),
   
   resetFlow: () => set({
     nodes: [],
     edges: [],
     strategyCode: '',
     backtestResults: null,
+    backtestPlotData: null,
   }),
 }))

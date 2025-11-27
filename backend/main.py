@@ -1,11 +1,14 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import asyncio
 from live_trader import LiveTrader
 from trade_journal import TradeJournal
+import yfinance as yf
+import pandas as pd
+from datetime import datetime, timedelta
 
 app = FastAPI(title="Wick Trading API")
 journal = TradeJournal()
@@ -27,6 +30,7 @@ class BacktestConfig(BaseModel):
     end_date: str
     cash: float = 1000000.0
     commission: float = 0.002
+    interval: str = None  # Optional: if not provided, optimal is selected automatically
 
 class DeploymentConfig(BaseModel):
     strategy_code: str
@@ -42,6 +46,130 @@ websocket_connections: Dict[str, WebSocket] = {}
 async def root():
     return {"status": "Wick Trading API", "version": "1.0.0"}
 
+
+@app.get("/chart/{ticker}")
+async def get_chart_data(
+    ticker: str,
+    period: str = Query(default="1y", description="Valid periods: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max"),
+    interval: str = Query(default="1d", description="Valid intervals: 1m,2m,5m,15m,30m,60m,90m,1h,1d,5d,1wk,1mo,3mo")
+):
+    """Fetch OHLCV chart data for a ticker using yfinance."""
+    
+    # Map intervals to their maximum allowed periods for yfinance
+    interval_max_periods = {
+        '1m': '7d',
+        '2m': '60d',
+        '5m': '60d',
+        '15m': '60d',
+        '30m': '60d',
+        '60m': '730d',
+        '1h': '730d',
+        '1d': 'max',
+        '5d': 'max',
+        '1wk': 'max',
+        '1mo': 'max',
+        '3mo': 'max',
+    }
+    
+    # Period ordering for capping
+    period_ordering = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
+    
+    # Auto-cap period if it exceeds the maximum for this interval
+    max_period_for_interval = interval_max_periods.get(interval, 'max')
+    if max_period_for_interval != 'max' and period in period_ordering:
+        max_idx = period_ordering.index(max_period_for_interval) if max_period_for_interval in period_ordering else len(period_ordering) - 1
+        current_idx = period_ordering.index(period) if period in period_ordering else -1
+        
+        if current_idx > max_idx:
+            period = max_period_for_interval
+    
+    try:
+        stock = yf.Ticker(ticker)
+        df = stock.history(period=period, interval=interval)
+        
+        if df.empty:
+            # Try to provide a helpful error message
+            return {
+                "success": False,
+                "error": f"No data available for {ticker.upper()} with {interval} interval and {period} period. This ticker may be delisted or invalid."
+            }
+        
+        # Convert to list of OHLCV candles for lightweight-charts
+        candles = []
+        for idx, row in df.iterrows():
+            # Convert timestamp to Unix seconds
+            timestamp = int(idx.timestamp())
+            candles.append({
+                "time": timestamp,
+                "open": round(row["Open"], 4),
+                "high": round(row["High"], 4),
+                "low": round(row["Low"], 4),
+                "close": round(row["Close"], 4),
+                "volume": int(row["Volume"]) if not pd.isna(row["Volume"]) else 0
+            })
+        
+        # Get stock info for display
+        info = stock.info
+        stock_info = {
+            "name": info.get("shortName", ticker),
+            "currency": info.get("currency", "USD"),
+            "exchange": info.get("exchange", ""),
+            "marketCap": info.get("marketCap"),
+            "previousClose": info.get("previousClose"),
+        }
+        
+        return {
+            "success": True,
+            "ticker": ticker.upper(),
+            "info": stock_info,
+            "candles": candles
+        }
+    except Exception as e:
+        error_msg = str(e)
+        # Filter out verbose yfinance warnings
+        if "possibly delisted" in error_msg.lower() or "no price data" in error_msg.lower():
+            return {
+                "success": False,
+                "error": f"Invalid ticker '{ticker.upper()}' or no data available. Please check the symbol and try again."
+            }
+        return {"success": False, "error": f"Failed to fetch data: {error_msg}"}
+
+
+@app.get("/search")
+async def search_tickers(q: str = Query(..., min_length=1, description="Search query")):
+    """Search for tickers by name or symbol."""
+    try:
+        # Use yfinance's search functionality
+        import requests
+        
+        # Yahoo Finance search API
+        url = f"https://query2.finance.yahoo.com/v1/finance/search"
+        params = {
+            "q": q,
+            "quotesCount": 10,
+            "newsCount": 0,
+            "enableFuzzyQuery": True,
+            "quotesQueryId": "tss_match_phrase_query"
+        }
+        headers = {"User-Agent": "Mozilla/5.0"}
+        
+        response = requests.get(url, params=params, headers=headers)
+        data = response.json()
+        
+        results = []
+        for quote in data.get("quotes", []):
+            if quote.get("quoteType") in ["EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY"]:
+                results.append({
+                    "symbol": quote.get("symbol"),
+                    "name": quote.get("shortname") or quote.get("longname", ""),
+                    "exchange": quote.get("exchange", ""),
+                    "type": quote.get("quoteType", "")
+                })
+        
+        return {"success": True, "results": results}
+    except Exception as e:
+        return {"success": False, "error": str(e), "results": []}
+
 @app.post("/backtest")
 async def run_backtest(config: BacktestConfig):
     """Execute a backtest with the given strategy and configuration."""
@@ -54,7 +182,8 @@ async def run_backtest(config: BacktestConfig):
             end=config.end_date,
             strategy_code=config.strategy_code,
             cash=config.cash,
-            commission=config.commission
+            commission=config.commission,
+            interval=config.interval
         )
         return {"success": True, "results": results}
     except Exception as e:

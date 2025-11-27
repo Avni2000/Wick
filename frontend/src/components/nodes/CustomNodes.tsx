@@ -37,6 +37,12 @@ const EXIT_DESCRIPTIONS: Record<string, string> = {
   'Trailing Stop': 'Parameters:\ntype - How the trail distance is calculated (Percentage or ATR Multiple)\nvalue/multiplier - The distance the stop trails behind the highest price\n\nTriggers:\nSell order when price drops from its highest point by the trail amount.\n\nDescription:\nA dynamic stop loss that follows the price upward but never moves down. Lets winners run while protecting accumulated gains. The stop only moves up as price makes new highs.'
 }
 
+// Price descriptions - available for tooltip use in IntradayPriceNode and other price nodes
+const PRICE_DESCRIPTIONS: Record<string, string> = {
+  'Intraday Price': 'Intraday Price (High-Frequency)\n\nParameter: interval\nTime interval for price sampling (1m, 5m, 15m, 30m, 1h, etc.)\n\nReturns:\nCurrent price sampled at the specified interval.\n\nUsage:\nPerform intraday trading checks during backtests\nMonitor price changes at sub-daily granularity\nOptimize for high-frequency price conditions\n\nDescription:\nAllows strategies to check price conditions at intraday intervals during backtesting. The system automatically selects the finest interval possible based on your backtest date range to maximize price granularity (e.g., 1h for a 400d range, 1m for a 7d range).'
+}
+void PRICE_DESCRIPTIONS // Reserved for future tooltip enhancement
+
 // Tooltip descriptions
 const TOOLTIP_DESCRIPTIONS: Record<string, string> = {
   'within': 'Parameter: within\nNumber of recent bars/days to scan.\n\nValues:\n- = Only check current bar\n3 = Within last 3 days\n5 = Within last 5 days\n10 = Within last 10 days\n20 = Within last 20 days\n\nReturns:\ntrue if condition was met on ANY of the checked bars.\n\nDescription:\nAdds flexibility to your entry timing. Instead of requiring the condition to be true RIGHT NOW, it checks if it was true recently. Useful when you don\'t need perfect timing.'
@@ -417,6 +423,177 @@ export const PriceNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
 })
 
 PriceNode.displayName = 'PriceNode'
+
+// Intraday Price Node - for high-frequency price checking with interval selection
+export const IntradayPriceNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {
+  const [comparison, setComparison] = useState(data.comparison || '>')
+  const [compareValue, setCompareValue] = useState<string | number>(data.compareValue || '')
+  const [barOffset, setBarOffset] = useState(data.barOffset || 0)
+  const [lookback, setLookback] = useState(data.lookback || 0)
+  const [interval, setInterval] = useState(data.config?.interval || '1h')
+  const { getEdges, getNode } = useReactFlow()
+
+  // Format comparison display
+  const getComparisonLabel = (op: string) => {
+    if (op === 'crosses_above') return '↗ crosses above'
+    if (op === 'crosses_below') return '↘ crosses below'
+    return op
+  }
+
+  // Find if there's a node connected to our left input
+  const getConnectedNodeLabel = () => {
+    const edges = getEdges()
+    const connectedEdge = edges.find(edge => edge.target === id && edge.targetHandle === 'compare-input')
+    if (connectedEdge) {
+      const sourceNode = getNode(connectedEdge.source)
+      return sourceNode?.data?.label || ''
+    }
+    return ''
+  }
+
+  const connectedNodeLabel = getConnectedNodeLabel()
+
+  const updateNodeData = (updates: Partial<NodeData>) => {
+    if (updates.comparison !== undefined) {
+      setComparison(updates.comparison)
+      Object.assign(data, { comparison: updates.comparison })
+    }
+    if (updates.compareValue !== undefined) {
+      setCompareValue(updates.compareValue)
+      Object.assign(data, { compareValue: updates.compareValue })
+    }
+    if (updates.barOffset !== undefined) {
+      setBarOffset(updates.barOffset as number)
+      Object.assign(data, { barOffset: updates.barOffset })
+    }
+    if (updates.lookback !== undefined) {
+      setLookback(updates.lookback as number)
+      Object.assign(data, { lookback: updates.lookback })
+    }
+    if (updates.interval !== undefined) {
+      setInterval(updates.interval)
+      if (!data.config) data.config = {}
+      data.config.interval = updates.interval
+    }
+  }
+
+  // Interval options matching WickChart.tsx
+  const intervalOptions = [
+    { value: '1m', label: '1 min' },
+    { value: '2m', label: '2 min' },
+    { value: '5m', label: '5 min' },
+    { value: '15m', label: '15 min' },
+    { value: '30m', label: '30 min' },
+    { value: '1h', label: '1 hour' },
+    { value: '1d', label: '1 day' },
+  ]
+
+  return (
+    <div className="relative group">
+      <DeleteButton nodeId={id} />
+      {/* Left handle - for chaining */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="compare-input"
+        className="w-3 h-3 !bg-blue-500 border-2 border-blue-300 shadow-lg"
+        style={{ top: '50%' }}
+      />
+
+      <div className="shadow-md border border-gray-300 min-w-[180px] transition-all hover:shadow-lg overflow-hidden">
+        {/* Blue Header */}
+        <div className="bg-blue-500 px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-white" />
+            <div className="font-semibold text-sm tracking-wide text-white">{data.label}</div>
+          </div>
+        </div>
+
+        {/* Grey Body */}
+        <div className="bg-gray-900 px-4 py-3">
+          {/* Interval selector */}
+          <div className="mb-3 pb-3 border-b border-gray-700">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">Interval:</span>
+              <select
+                value={interval}
+                onChange={(e) => updateNodeData({ interval: e.target.value })}
+                className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded-md border border-gray-700 flex-1 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+              >
+                {intervalOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Built-in comparison */}
+          <div className="flex items-center gap-2">
+            <select
+              value={comparison}
+              onChange={(e) => updateNodeData({ comparison: e.target.value })}
+              className="bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+            >
+              {Object.values(COMPARISON_TYPES).map(op => (
+                <option key={op} value={op}>{getComparisonLabel(op)}</option>
+              ))}
+            </select>
+
+            <input
+              type="text"
+              value={(connectedNodeLabel || String(compareValue)) as string | number}
+              onChange={(e) => !connectedNodeLabel && updateNodeData({ compareValue: e.target.value })}
+              placeholder="value"
+              disabled={!!connectedNodeLabel}
+              className={`bg-gray-800 text-gray-100 text-xs px-2 py-1.5 rounded-md border border-gray-700 w-20 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm ${connectedNodeLabel ? 'bg-gray-700 cursor-not-allowed' : ''}`}
+            />
+          </div>
+
+          {/* Bar offset and lookback */}
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200">
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400">Bar:</span>
+              <select
+                value={barOffset}
+                onChange={(e) => updateNodeData({ barOffset: parseInt(e.target.value) })}
+                className="bg-gray-800 text-gray-100 text-xs px-1 py-1 rounded border border-gray-700 w-14"
+              >
+                <option value={0}>Now</option>
+                <option value={1}>-1</option>
+                <option value={2}>-2</option>
+                <option value={3}>-3</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-400">Within:</span>
+              <select
+                value={lookback}
+                onChange={(e) => updateNodeData({ lookback: parseInt(e.target.value) })}
+                className="bg-gray-800 text-gray-100 text-xs px-1 py-1 rounded border border-gray-700 w-14"
+                title={formatDescription(TOOLTIP_DESCRIPTIONS['within']).replace(/\n/g, '&#10;')}
+              >
+                <option value={0}>-</option>
+                <option value={3}>3</option>
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right handle - output */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="w-3 h-3 !bg-blue-500 border-2 border-blue-300 shadow-lg"
+      />
+    </div>
+  )
+})
+
+IntradayPriceNode.displayName = 'IntradayPriceNode'
 
 // Action Node (Buy/Sell)
 export const ActionNode = memo(({ data, id }: NodeProps<Node<NodeData>>) => {

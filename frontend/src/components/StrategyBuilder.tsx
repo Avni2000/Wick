@@ -11,7 +11,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import dagre from 'dagre'
 import { useStrategyStore } from '../store/strategyStore'
-import { LogicNode, IndicatorNode, PriceNode, ActionNode, ExitNode } from './nodes/CustomNodes'
+import { LogicNode, IndicatorNode, PriceNode, ActionNode, ExitNode, IntradayPriceNode } from './nodes/CustomNodes'
 import NodePalette from './NodePalette'
 import { generateStrategyCode } from '../utils/codeGenerator'
 import { InfoPanelProvider } from '../contexts/InfoPanelContext'
@@ -20,6 +20,7 @@ const nodeTypes = {
   logic: LogicNode,
   indicator: IndicatorNode,
   price: PriceNode,
+  intraday_price: IntradayPriceNode,
   action: ActionNode,
   exit: ExitNode,
 }
@@ -27,10 +28,12 @@ const nodeTypes = {
 export default function StrategyBuilder({
   onCodeGenerated,
   onBacktestResults,
+  onBacktestTicker,
   onSwitchTab
 }: {
   onCodeGenerated: (code: string) => void
   onBacktestResults: (results: any) => void
+  onBacktestTicker?: (ticker: string) => void
   onSwitchTab?: (tab: 'builder' | 'backtest' | 'live') => void
 }) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, setStrategyCode, addNode, setNodes } = useStrategyStore()
@@ -284,6 +287,7 @@ export default function StrategyBuilder({
       } else {
         // Extract the actual results from the wrapper
         onBacktestResults(data.results)
+        onBacktestTicker?.(backtestConfig.ticker)
         setShowBacktestModal(false)
         onSwitchTab?.('backtest')
       }
