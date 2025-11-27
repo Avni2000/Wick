@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wick"
+version = "0.1.0"
+description = "Visual Trading Strategy Builder and Backtesting Platform"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Avni2000", email = "avnibadiwale@gmail.com"}
+]
+keywords = ["trading", "backtesting", "strategy", "finance", "stocks"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "websockets>=12.0",
+    "pydantic>=2.6.0",
+    "backtesting>=0.3.3",
+    "yfinance>=0.2.66",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Avni2000/Wick"
+Repository = "https://github.com/Avni2000/Wick.git"
+Issues = "https://github.com/Avni2000/Wick/issues"
+
+[project.scripts]
+wick = "wick.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+wick = ["static/**/*"]

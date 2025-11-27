@@ -8,18 +8,35 @@ Wick is my solution to the cost and pains associated with algorithmic trading. I
 
 It's essentially a hybrid between scratch and n8n for people who can't be bothered to learn python.
 
+## Installation
 
-## TODO
+Install Wick as a pip package:
 
-- Pack as pip/python-first package with a web gui component
-- Paper trade -> trade locally
-- Allow BYOK. I plan on using Public, but I would like to add support for Alpaca and a few others too.
+```bash
+pip install wick
+```
 
-## Run/Develop (Currently)
+Then launch the GUI in your browser:
 
-Very typical for python backend web apps:
+```bash
+wick gui
+```
 
-Backend:
+This will start the server at `http://127.0.0.1:8000` and open your browser automatically.
+
+### CLI Options
+
+```bash
+wick gui --help           # Show all options
+wick gui --port 3000      # Use a different port
+wick gui --no-browser     # Don't open browser automatically
+```
+
+## Development
+
+For development, you can run the frontend and backend separately:
+
+### Backend:
 ```bash
 cd backend
 python -m venv venv
@@ -27,11 +44,29 @@ source venv/bin/activate # or whatever shell you have
 pip install -r requirements.txt
 python main.py
 ```
-Frontend:
+
+### Frontend:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
+### Building the Package
+
+To build the pip package with the frontend:
+
+```bash
+cd frontend
+npm run build  # Builds to src/wick/static/
+
+# Then install locally
+pip install -e .
+```
+
+## TODO
+
+- Paper trade -> trade locally
+- Allow BYOK. I plan on using Public, but I would like to add support for Alpaca and a few others too.
 
 Contributions welcome.

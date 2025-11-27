@@ -48,6 +48,15 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Python package build artifacts
+src/wick/static/assets/
+src/wick/static/index.html
+src/wick/static/vite.svg
+*.egg-info/
+build/
+*.whl
 .cache/
 
 backend/__pycache__
+src/wick/__pycache__

@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createChart, ColorType, type IChartApi, type ISeriesApi, CandlestickSeries, LineSeries } from 'lightweight-charts'
 import { INDICATOR_TYPES, NODE_CONFIGS } from '../types/nodes'
 import { useStrategyStore, type TradeMarker } from '../store/strategyStore'
-
-const API_BASE = 'http://localhost:8000'
+import { API } from '../utils/api'
 
 interface CandleData {
     time: number
@@ -436,14 +435,14 @@ export default function WickChart() {
         setError(null)
         
         try {
-            const response = await fetch(`${API_BASE}/chart/${ticker}?period=${period}&interval=${interval}`)
+            const response = await fetch(API.chart(ticker, period, interval))
             const data = await response.json()
             
             if (data.success) {
                 setChartData(data.candles)
                 setStockInfo(data.info)
-                // Only update ticker if it changed (avoid triggering effect loops)
-                setCurrentTicker(prev => prev !== data.ticker ? data.ticker : prev)
+                // Note: Don't update currentTicker here - it causes loops
+                // The ticker is already set by the caller
             } else {
                 setError(data.error || 'Failed to fetch data')
             }
@@ -463,7 +462,7 @@ export default function WickChart() {
         
         setIsSearching(true)
         try {
-            const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`)
+            const response = await fetch(API.search(query))
             const data = await response.json()
             
             if (data.success) {
@@ -499,13 +498,22 @@ export default function WickChart() {
 
     // Track if this is the initial mount to avoid double-fetching
     const isInitialMount = useRef(true)
+    // Track if we've already applied backtest data to avoid re-applying on tab switches
+    const appliedBacktestRef = useRef<string | null>(null)
 
     // Fetch data when ticker, interval, or period changes
     useEffect(() => {
         // Skip the first run since we'll fetch on mount anyway
         if (isInitialMount.current) {
             isInitialMount.current = false
-            fetchChartData(currentTicker, selectedPeriod, selectedInterval)
+            // Check if we have backtest data to show - if so, use that ticker
+            if (backtestPlotData && appliedBacktestRef.current !== backtestPlotData.ticker) {
+                appliedBacktestRef.current = backtestPlotData.ticker
+                fetchChartData(backtestPlotData.ticker.toUpperCase(), selectedPeriod, selectedInterval)
+                setCurrentTicker(backtestPlotData.ticker.toUpperCase())
+            } else {
+                fetchChartData(currentTicker, selectedPeriod, selectedInterval)
+            }
             return
         }
         
@@ -518,8 +526,10 @@ export default function WickChart() {
     // Handle backtest plot data - switch to the backtest ticker
     // Note: We only set the ticker here; the main data fetch effect will handle fetching
     useEffect(() => {
-        if (backtestPlotData) {
-            setCurrentTicker(prev => prev !== backtestPlotData.ticker ? backtestPlotData.ticker : prev)
+        if (backtestPlotData && appliedBacktestRef.current !== backtestPlotData.ticker) {
+            appliedBacktestRef.current = backtestPlotData.ticker
+            const upperTicker = backtestPlotData.ticker.toUpperCase()
+            setCurrentTicker(prev => prev.toUpperCase() !== upperTicker ? upperTicker : prev)
         }
     }, [backtestPlotData])
 

@@ -15,6 +15,7 @@ import { LogicNode, IndicatorNode, PriceNode, ActionNode, ExitNode, IntradayPric
 import NodePalette from './NodePalette'
 import { generateStrategyCode } from '../utils/codeGenerator'
 import { InfoPanelProvider } from '../contexts/InfoPanelContext'
+import { API } from '../utils/api'
 
 const nodeTypes = {
   logic: LogicNode,
@@ -266,7 +267,7 @@ export default function StrategyBuilder({
     }
 
     try {
-      const response = await fetch('http://localhost:8000/backtest', {
+      const response = await fetch(API.backtest, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

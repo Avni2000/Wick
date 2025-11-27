@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStrategyStore } from '../store/strategyStore'
+import { API } from '../utils/api'
 
 interface Position {
   ticker: string
@@ -58,7 +59,7 @@ export default function LiveDashboard({
     }
 
     try {
-      const response = await fetch('http://localhost:8000/deploy', {
+      const response = await fetch(API.deploy, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,7 +91,7 @@ export default function LiveDashboard({
     if (!deploymentId) return
 
     try {
-      await fetch(`http://localhost:8000/deploy/${deploymentId}`, {
+      await fetch(API.deploymentStop(deploymentId), {
         method: 'DELETE',
       })
 
@@ -110,7 +111,7 @@ export default function LiveDashboard({
   }
 
   const connectWebSocket = (depId: string) => {
-    const ws = new WebSocket(`ws://localhost:8000/ws/${depId}`)
+    const ws = new WebSocket(API.ws(depId))
     
     ws.onopen = () => {
       addLog('WebSocket connected')
