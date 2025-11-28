@@ -4,16 +4,23 @@ Wick is my solution to the cost and pains associated with algorithmic trading. I
 
 1. Wick as an algorithmic trading and live deployment as a VSCode extension/custom IDE
 2. Wick as a website
-3. Wick as an n8n like node-as-workflow-builder that runs and operates locally with BYOK for live, intraday trading. 
+3. And finally Wick as an n8n like node-as-workflow-builder that runs and operates locally with BYOK for live, intraday trading. 
 
 It's essentially a hybrid between scratch and n8n for people who can't be bothered to learn python.
 
 ## Installation
 
+> [!WARNING]
+> This project is almost entirely AI generated, and I haven't got the chance to review the last few commits. 
+> Please be careful using it right now for anything serious
+
+
 Install Wick as a pip package:
 
 ```bash
-pip install wick
+git clone https://github.com/Avni2000/Wick.git
+cd Wick
+pip install -e .
 ```
 
 Then launch the GUI in your browser:
