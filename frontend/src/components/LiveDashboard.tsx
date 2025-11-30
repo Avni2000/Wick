@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStrategyStore } from '../store/strategyStore'
 import { API } from '../utils/api'
+import ApiKeyModal from './ApiKeyModal'
 
 interface Position {
   ticker: string
@@ -36,10 +37,15 @@ export default function LiveDashboard({
   const [deploymentId, setDeploymentId] = useState<string | null>(null)
   const [ticker, setTicker] = useState('RKLB')
   const [interval, setInterval] = useState('1min')
+  const [mode, setMode] = useState<'paper' | 'live'>('paper')
+  const [isConfigOpen, setIsConfigOpen] = useState(false)
   const [position, setPosition] = useState<Position | null>(null)
   const [signals, setSignals] = useState<Signal[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [logs, setLogs] = useState<string[]>([])
+  const [isChecking, setIsChecking] = useState(false)
+  const [lastCheckTime, setLastCheckTime] = useState<string | null>(null)
+  const [checkCount, setCheckCount] = useState(0)
   const wsRef = useRef<WebSocket | null>(null)
 
   const setActiveDeployment = useStrategyStore((state) => state.setActiveDeployment)
@@ -66,12 +72,12 @@ export default function LiveDashboard({
           strategy_code: strategyCode,
           ticker,
           interval,
-          mode: 'paper',
+          mode,
         }),
       })
 
       const result = await response.json()
-      
+
       if (result.deployment_id) {
         setDeploymentId(result.deployment_id)
         setIsDeployed(true)
@@ -98,11 +104,11 @@ export default function LiveDashboard({
       setIsDeployed(false)
       setDeploymentId(null)
       setActiveDeployment(null)
-      
+
       if (wsRef.current) {
         wsRef.current.close()
       }
-      
+
       addLog(`Stopped deployment`)
     } catch (error) {
       alert('Failed to stop deployment: ' + error)
@@ -112,15 +118,26 @@ export default function LiveDashboard({
 
   const connectWebSocket = (depId: string) => {
     const ws = new WebSocket(API.ws(depId))
-    
+
     ws.onopen = () => {
       addLog('WebSocket connected')
     }
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
-      
+
       switch (data.type) {
+        case 'checking_signal':
+          setIsChecking(true)
+          setCheckCount((prev) => prev + 1)
+          addLog('🔍 Checking for signals...')
+          break
+
+        case 'signal_checked':
+          setIsChecking(false)
+          setLastCheckTime(new Date().toLocaleTimeString())
+          break
+
         case 'signal':
           addSignal({
             timestamp: new Date().toLocaleTimeString(),
@@ -193,7 +210,7 @@ export default function LiveDashboard({
       {/* Deployment Controls */}
       <div className="bg-dark-surface p-4 rounded-lg border border-dark-border mb-6">
         <h3 className="text-lg font-semibold mb-4 text-dark-text">Deployment</h3>
-        
+
         {!isDeployed ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -221,33 +238,146 @@ export default function LiveDashboard({
                 </select>
               </div>
             </div>
-            
-            <button
-              onClick={handleDeploy}
-              disabled={!strategyCode}
-              className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded transition-colors"
-            >
-              Deploy Strategy
-            </button>
+
+            <div className="mb-4">
+              <label className="block text-sm text-dark-muted mb-3 font-semibold">Trading Mode</label>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Paper Trading Card */}
+                <button
+                  type="button"
+                  onClick={() => setMode('paper')}
+                  className={`p-4 rounded-lg border-2 transition-all ${mode === 'paper'
+                      ? 'border-green-500 bg-green-900/30'
+                      : 'border-dark-border bg-dark-bg hover:border-green-700'
+                    }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${mode === 'paper' ? 'border-green-500' : 'border-dark-border'
+                      }`}>
+                      {mode === 'paper' && <div className="w-2 h-2 bg-green-500 rounded-full"></div>}
+                    </div>
+                    <span className="text-lg font-bold text-dark-text">📝 Paper Trading</span>
+                  </div>
+                  <p className="text-xs text-dark-muted">Practice with simulated funds</p>
+                </button>
+
+                {/* Live Trading Card */}
+                <button
+                  type="button"
+                  onClick={() => setMode('live')}
+                  className={`p-4 rounded-lg border-2 transition-all ${mode === 'live'
+                      ? 'border-red-500 bg-red-900/30'
+                      : 'border-dark-border bg-dark-bg hover:border-red-700'
+                    }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${mode === 'live' ? 'border-red-500' : 'border-dark-border'
+                      }`}>
+                      {mode === 'live' && <div className="w-2 h-2 bg-red-500 rounded-full"></div>}
+                    </div>
+                    <span className="text-lg font-bold text-dark-text">🚀 Live Trading</span>
+                  </div>
+                  <p className="text-xs text-dark-muted">Trade with real money</p>
+                </button>
+              </div>
+            </div>
+
+            {mode === 'live' && (
+              <div className="mb-4 p-4 bg-red-900/20 border-2 border-red-700/50 rounded-lg text-sm">
+                <div className="flex items-start gap-2">
+                  <span className="text-xl">⚠️</span>
+                  <div>
+                    <div className="text-red-200 font-semibold mb-1">Live Trading Mode</div>
+                    <div className="text-red-300/80 text-xs">
+                      You are about to deploy a strategy with REAL MONEY. Make sure your API key is configured.
+                    </div>
+                    <button
+                      onClick={() => setIsConfigOpen(true)}
+                      className="mt-2 text-red-400 hover:text-red-300 underline text-xs font-semibold"
+                    >
+                      Configure API Key →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsConfigOpen(true)}
+                className="px-4 py-2 bg-dark-bg border border-dark-border hover:bg-dark-border text-dark-text rounded transition-colors"
+              >
+                ⚙️ Config
+              </button>
+              <button
+                onClick={handleDeploy}
+                disabled={!strategyCode}
+                className={`flex-1 px-4 py-2 text-white rounded transition-colors ${mode === 'live'
+                  ? 'bg-red-600 hover:bg-red-700 disabled:bg-gray-600'
+                  : 'bg-green-600 hover:bg-green-700 disabled:bg-gray-600'
+                  }`}
+              >
+                {mode === 'live' ? '🚀 Deploy Live Strategy' : 'Deploy Paper Strategy'}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            {/* Mode Badge */}
+            <div className="flex items-center justify-between p-4 bg-dark-bg rounded-lg border-2 border-dark-border">
               <div>
                 <div className="text-dark-text font-semibold">{ticker} - {interval}</div>
                 <div className="text-sm text-dark-muted">Deployment ID: {deploymentId}</div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-green-500 font-semibold">Live</span>
+              <div className={`px-4 py-2 rounded-lg font-bold text-lg ${mode === 'live'
+                ? 'bg-red-600 text-white'
+                : 'bg-green-600 text-white'
+                }`}>
+                {mode === 'live' ? '🚀 LIVE TRADING' : '📝 PAPER TRADING'}
               </div>
             </div>
-            
+
+            {/* Signal Checking Status */}
+            <div className="p-4 bg-dark-bg rounded-lg border border-dark-border">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-dark-text">Signal Monitoring</h4>
+                <div className="flex items-center gap-2">
+                  {isChecking ? (
+                    <>
+                      <div className="relative">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full animate-ping absolute"></div>
+                        <div className="w-3 h-3 bg-blue-500 rounded-full relative"></div>
+                      </div>
+                      <span className="text-blue-400 font-semibold text-sm">Checking signals...</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-green-500 font-semibold text-sm">Active</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-dark-surface p-2 rounded">
+                  <div className="text-dark-muted text-xs">Checks Performed</div>
+                  <div className="text-dark-text font-bold text-lg">{checkCount}</div>
+                </div>
+                <div className="bg-dark-surface p-2 rounded">
+                  <div className="text-dark-muted text-xs">Last Check</div>
+                  <div className="text-dark-text font-bold text-lg">
+                    {lastCheckTime || 'Waiting...'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <button
               onClick={handleStop}
-              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors font-semibold"
             >
-              Stop Deployment
+              ⏹ Stop Deployment
             </button>
           </div>
         )}
@@ -297,11 +427,10 @@ export default function LiveDashboard({
               signals.map((signal, idx) => (
                 <div key={idx} className="text-sm border-b border-dark-border pb-2">
                   <div className="flex justify-between items-center">
-                    <span className={`font-semibold ${
-                      signal.type === 'BUY' ? 'text-green-500' :
+                    <span className={`font-semibold ${signal.type === 'BUY' ? 'text-green-500' :
                       signal.type === 'SELL' ? 'text-red-500' :
-                      'text-yellow-500'
-                    }`}>
+                        'text-yellow-500'
+                      }`}>
                       {signal.type}
                     </span>
                     <span className="text-dark-muted">{signal.timestamp}</span>
@@ -350,6 +479,11 @@ export default function LiveDashboard({
           )}
         </div>
       </div>
-    </div>
+
+      <ApiKeyModal
+        isOpen={isConfigOpen}
+        onClose={() => setIsConfigOpen(false)}
+      />
+    </div >
   )
 }

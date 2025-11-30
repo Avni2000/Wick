@@ -13,12 +13,14 @@ class LiveTrader:
     """Execute paper trading strategies with minute-level updates"""
     
     def __init__(self, deployment_id: str, strategy_code: str, ticker: str, 
-                 interval: str = "1min", journal=None):
+                 interval: str = "1min", journal=None, mode: str = "paper", api_key: str = None):
         self.deployment_id = deployment_id
         self.strategy_code = strategy_code
         self.ticker = ticker
         self.interval = interval
         self.journal = journal
+        self.mode = mode
+        self.api_key = api_key
         self.running = False
         self.position_size = 10000.0
         self.websocket_callback = None
@@ -31,19 +33,37 @@ class LiveTrader:
         
         while self.running:
             try:
-                signal = await self.evaluate_strategy()
-                
-                if signal != "HOLD":
-                    await self.execute_trade(signal)
-                
+                # Notify that we're checking for signals
                 if self.websocket_callback:
                     await self.websocket_callback({
-                        "type": "signal",
+                        "type": "checking_signal",
                         "deployment_id": self.deployment_id,
-                        "ticker": self.ticker,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                
+                signal = await self.evaluate_strategy()
+                
+                # Notify that signal check is complete
+                if self.websocket_callback:
+                    await self.websocket_callback({
+                        "type": "signal_checked",
+                        "deployment_id": self.deployment_id,
                         "signal": signal,
                         "timestamp": datetime.now().isoformat()
                     })
+                
+                if signal != "HOLD":
+                    await self.execute_trade(signal)
+                    
+                    # Send signal update via WebSocket
+                    if self.websocket_callback:
+                        await self.websocket_callback({
+                            "type": "signal",
+                            "deployment_id": self.deployment_id,
+                            "ticker": self.ticker,
+                            "signal": signal,
+                            "timestamp": datetime.now().isoformat()
+                        })
                 
                 await asyncio.sleep(self._get_sleep_seconds())
                 

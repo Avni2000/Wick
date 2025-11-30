@@ -57,9 +57,36 @@ class DeploymentConfig(BaseModel):
     mode: str = "paper"
 
 
+class ConfigUpdate(BaseModel):
+    api_key: str
+
+
 # In-memory active deployments and traders
 active_deployments: Dict[str, LiveTrader] = {}
 websocket_connections: Dict[str, WebSocket] = {}
+
+
+def get_config_path() -> Path:
+    """Get the path to the configuration file."""
+    config_dir = Path.home() / ".wick"
+    config_dir.mkdir(exist_ok=True)
+    return config_dir / "config.json"
+
+
+def load_config() -> dict:
+    """Load configuration from file."""
+    config_path = get_config_path()
+    if config_path.exists():
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    return {}
+
+
+def save_config(config: dict):
+    """Save configuration to file."""
+    config_path = get_config_path()
+    with open(config_path, 'w') as f:
+        json.dump(config, f, indent=2)
 
 
 @app.get("/api")
@@ -181,6 +208,35 @@ async def run_backtest_endpoint(config: BacktestConfig):
         return {"success": False, "error": str(e)}
 
 
+@app.get("/api/config")
+async def get_config():
+    """Get current configuration (API key will be masked)."""
+    config = load_config()
+    masked_config = {}
+    
+    if 'api_key' in config and config['api_key']:
+        # Mask the API key for display
+        key = config['api_key']
+        if len(key) > 8:
+            masked_config['api_key'] = key[:4] + "*" * (len(key) - 8) + key[-4:]
+        else:
+            masked_config['api_key'] = "*" * len(key)
+    
+    return {"success": True, "config": masked_config}
+
+
+@app.post("/api/config")
+async def update_config(config_update: ConfigUpdate):
+    """Update API configuration."""
+    try:
+        config = load_config()
+        config['api_key'] = config_update.api_key
+        save_config(config)
+        return {"success": True, "message": "Configuration updated successfully"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @app.post("/api/deploy")
 async def deploy_strategy(config: DeploymentConfig):
     """Deploy a strategy for live/paper trading."""
@@ -199,12 +255,25 @@ async def deploy_strategy(config: DeploymentConfig):
         mode=config.mode
     )
     
+    # Load API key from config if in live mode
+    api_key = None
+    if config.mode == "live":
+        stored_config = load_config()
+        api_key = stored_config.get('api_key')
+        if not api_key:
+            return {
+                "success": False,
+                "error": "API key not configured. Run 'wick config --set-api-key YOUR_KEY' or configure it in the GUI."
+            }
+    
     trader = LiveTrader(
         deployment_id=deployment_id,
         strategy_code=config.strategy_code,
         ticker=config.ticker,
         interval=config.interval,
-        journal=journal
+        journal=journal,
+        mode=config.mode,
+        api_key=api_key
     )
     
     asyncio.create_task(trader.start())

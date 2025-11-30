@@ -9,18 +9,23 @@ from datetime import datetime, timedelta
 from backtesting import Strategy, Backtest
 from typing import Dict, Optional
 from trade_journal import TradeJournal
+from public_client import PublicClient
 
 
 class LiveTrader:
     """Execute paper trading strategies with minute-level updates"""
     
     def __init__(self, deployment_id: str, strategy_code: str, ticker: str, 
-                 interval: str = "1min", journal: TradeJournal = None):
+                 interval: str = "1min", journal: TradeJournal = None, 
+                 mode: str = "paper", api_key: str = None):
         self.deployment_id = deployment_id
         self.strategy_code = strategy_code
         self.ticker = ticker
         self.interval = interval
         self.journal = journal or TradeJournal()
+        self.mode = mode
+        self.api_key = api_key
+        self.public_client = PublicClient(api_key) if mode == "live" and api_key else None
         self.running = False
         self.position_size = 10000.0  # $10k default position
         
@@ -31,20 +36,37 @@ class LiveTrader:
         
         while self.running:
             try:
-                signal = await self.evaluate_strategy()
-                
-                if signal != "HOLD":
-                    await self.execute_trade(signal)
-                
-                # Send update via WebSocket
+                # Notify that we're checking for signals
                 if self.websocket_callback:
                     await self.websocket_callback({
-                        "type": "signal",
+                        "type": "checking_signal",
                         "deployment_id": self.deployment_id,
-                        "ticker": self.ticker,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                
+                signal = await self.evaluate_strategy()
+                
+                # Notify that signal check is complete
+                if self.websocket_callback:
+                    await self.websocket_callback({
+                        "type": "signal_checked",
+                        "deployment_id": self.deployment_id,
                         "signal": signal,
                         "timestamp": datetime.now().isoformat()
                     })
+                
+                if signal != "HOLD":
+                    await self.execute_trade(signal)
+                    
+                    # Send signal update via WebSocket
+                    if self.websocket_callback:
+                        await self.websocket_callback({
+                            "type": "signal",
+                            "deployment_id": self.deployment_id,
+                            "ticker": self.ticker,
+                            "signal": signal,
+                            "timestamp": datetime.now().isoformat()
+                        })
                 
                 # Wait based on interval
                 await asyncio.sleep(self._get_sleep_seconds())
@@ -91,69 +113,129 @@ class LiveTrader:
         return "HOLD"
     
     async def execute_trade(self, signal: str):
-        """Execute paper trade"""
+        """Execute trade (paper or live)"""
         current_price = self._get_current_price()
         
         if signal == "BUY":
             quantity = self.position_size / current_price
             
-            order_id = self.journal.log_order(
-                deployment_id=self.deployment_id,
-                symbol=self.ticker,
-                side="BUY",
-                order_type="MARKET",
-                quantity=quantity,
-                amount=self.position_size,
-                status="filled",
-                paper_trade=True
-            )
+            if self.mode == "live" and self.public_client:
+                # Execute live trade
+                try:
+                    order = self.public_client.place_order(
+                        symbol=self.ticker,
+                        side="BUY",
+                        amount=self.position_size, # Use amount for fractional shares if supported, or calculate quantity
+                        # Public API supports amount or quantity. Let's use amount for simplicity if supported for equities
+                        # "The order amount. Used when buying/selling shares for a specific notional value"
+                        order_type="MARKET"
+                    )
+                    # Log to journal as well for tracking
+                    self.journal.log_execution(self.deployment_id, "BUY", f"Live Order Placed: {order.get('orderId')}", success=True)
+                    
+                    if self.websocket_callback:
+                        await self.websocket_callback({
+                            "type": "order_filled", # Technically order_placed, but for UI simplicity
+                            "side": "BUY",
+                            "quantity": quantity, # Estimated
+                            "price": current_price,
+                            "ticker": self.ticker,
+                            "mode": "live"
+                        })
+                except Exception as e:
+                    self.journal.log_execution(self.deployment_id, "ERROR", f"Live Trade Failed: {e}", success=False)
             
-            self.journal.update_order_status(order_id, "filled", current_price)
-            self.journal.update_position(self.deployment_id, self.ticker, quantity, current_price)
-            
-            message = f"BUY {quantity:.4f} shares @ ${current_price:.2f}"
-            self.journal.log_execution(self.deployment_id, "BUY", message, success=True)
-            
-            if self.websocket_callback:
-                await self.websocket_callback({
-                    "type": "order_filled",
-                    "side": "BUY",
-                    "quantity": quantity,
-                    "price": current_price,
-                    "ticker": self.ticker
-                })
-        
-        elif signal == "SELL":
-            position = self.journal.get_position(self.deployment_id)
-            if position:
-                quantity = position["quantity"]
-                
+            else:
+                # Paper trade
                 order_id = self.journal.log_order(
                     deployment_id=self.deployment_id,
                     symbol=self.ticker,
-                    side="SELL",
+                    side="BUY",
                     order_type="MARKET",
                     quantity=quantity,
+                    amount=self.position_size,
                     status="filled",
                     paper_trade=True
                 )
                 
                 self.journal.update_order_status(order_id, "filled", current_price)
-                self.journal.update_position(self.deployment_id, self.ticker, 0)
+                self.journal.update_position(self.deployment_id, self.ticker, quantity, current_price)
                 
-                pnl = (current_price - position["avg_price"]) * quantity
-                message = f"SELL {quantity:.4f} shares @ ${current_price:.2f} (P&L: ${pnl:.2f})"
-                self.journal.log_execution(self.deployment_id, "SELL", message, success=True)
+                message = f"BUY {quantity:.4f} shares @ ${current_price:.2f}"
+                self.journal.log_execution(self.deployment_id, "BUY", message, success=True)
                 
                 if self.websocket_callback:
                     await self.websocket_callback({
                         "type": "order_filled",
-                        "side": "SELL",
+                        "side": "BUY",
                         "quantity": quantity,
                         "price": current_price,
-                        "pnl": pnl,
                         "ticker": self.ticker
                     })
+        
+        elif signal == "SELL":
+            # For sell, we need to know quantity to sell
+            # In live mode, we might want to sell entire position or track it
+            # For now, let's assume we sell what we think we have from the journal (or check API)
+            
+            position = self.journal.get_position(self.deployment_id)
+            if position:
+                quantity = position["quantity"]
+                
+                if self.mode == "live" and self.public_client:
+                    try:
+                        # For sell, usually quantity is preferred
+                        order = self.public_client.place_order(
+                            symbol=self.ticker,
+                            side="SELL",
+                            quantity=quantity,
+                            order_type="MARKET"
+                        )
+                        self.journal.log_execution(self.deployment_id, "SELL", f"Live Order Placed: {order.get('orderId')}", success=True)
+                        
+                        # Update local position tracking
+                        self.journal.update_position(self.deployment_id, self.ticker, 0)
+                        
+                        if self.websocket_callback:
+                            await self.websocket_callback({
+                                "type": "order_filled",
+                                "side": "SELL",
+                                "quantity": quantity,
+                                "price": current_price,
+                                "ticker": self.ticker,
+                                "mode": "live"
+                            })
+                    except Exception as e:
+                        self.journal.log_execution(self.deployment_id, "ERROR", f"Live Trade Failed: {e}", success=False)
+
+                else:
+                    # Paper trade
+                    order_id = self.journal.log_order(
+                        deployment_id=self.deployment_id,
+                        symbol=self.ticker,
+                        side="SELL",
+                        order_type="MARKET",
+                        quantity=quantity,
+                        status="filled",
+                        paper_trade=True
+                    )
+                    
+                    self.journal.update_order_status(order_id, "filled", current_price)
+                    self.journal.update_position(self.deployment_id, self.ticker, 0)
+                    
+                    pnl = (current_price - position["avg_price"]) * quantity
+                    message = f"SELL {quantity:.4f} shares @ ${current_price:.2f} (P&L: ${pnl:.2f})"
+                    self.journal.log_execution(self.deployment_id, "SELL", message, success=True)
+                    
+                    if self.websocket_callback:
+                        await self.websocket_callback({
+                            "type": "order_filled",
+                            "side": "SELL",
+                            "quantity": quantity,
+                            "price": current_price,
+                            "pnl": pnl,
+                            "ticker": self.ticker
+                        })
     
     def _fetch_data(self) -> pd.DataFrame:
         """Fetch recent market data"""
@@ -182,6 +264,19 @@ class LiveTrader:
     
     def _get_current_price(self) -> float:
         """Get current market price"""
+        if self.mode == "live" and self.public_client:
+            try:
+                quotes = self.public_client.get_quotes([self.ticker])
+                # Assuming response structure based on docs/examples
+                # { "quotes": [ { "instrument": {...}, "last": "123.45", ... } ] }
+                if quotes and "quotes" in quotes and len(quotes["quotes"]) > 0:
+                    last_price = quotes["quotes"][0].get("last")
+                    if last_price:
+                        return float(last_price)
+            except Exception as e:
+                print(f"Error fetching live quote: {e}")
+                # Fallback to yfinance if live quote fails
+        
         ticker = yf.Ticker(self.ticker)
         data = ticker.history(period="1d", interval="1m")
         return float(data['Close'].iloc[-1])

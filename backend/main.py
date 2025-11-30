@@ -38,6 +38,10 @@ class DeploymentConfig(BaseModel):
     interval: str  # e.g., "1min", "5min", "1h"
     mode: str = "paper"  # paper or live
 
+class Config(BaseModel):
+    api_key: str
+    save_path: Optional[str] = "config.json"
+
 # In-memory active deployments and traders
 active_deployments: Dict[str, LiveTrader] = {}
 websocket_connections: Dict[str, WebSocket] = {}
@@ -208,13 +212,27 @@ async def deploy_strategy(config: DeploymentConfig):
         mode=config.mode
     )
     
+    # Load API key if live mode
+    api_key = None
+    if config.mode == "live":
+        try:
+            with open("config.json", "r") as f:
+                saved_config = json.load(f)
+                api_key = saved_config.get("api_key")
+                if not api_key:
+                    return {"success": False, "error": "API key not found. Please configure it first."}
+        except FileNotFoundError:
+            return {"success": False, "error": "Configuration not found. Please configure API key first."}
+
     # Create and start live trader
     trader = LiveTrader(
         deployment_id=deployment_id,
         strategy_code=config.strategy_code,
         ticker=config.ticker,
         interval=config.interval,
-        journal=journal
+        journal=journal,
+        mode=config.mode,
+        api_key=api_key
     )
     
     # Start trading in background
@@ -258,6 +276,30 @@ async def get_deployment_history(deployment_id: str):
     """Get full history for a deployment."""
     history = journal.get_deployment_history(deployment_id)
     return {"success": True, "history": history}
+
+@app.post("/config")
+async def save_config(config: Config):
+    """Save configuration (API key) to local file."""
+    try:
+        with open("config.json", "w") as f:
+            json.dump(config.dict(), f)
+        return {"success": True, "message": "Configuration saved successfully"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/config")
+async def get_config():
+    """Get current configuration."""
+    try:
+        with open("config.json", "r") as f:
+            config = json.load(f)
+            # Mask API key for security in UI if needed, but for now return it so user sees it's there
+            # Or maybe just return "configured": True
+            return {"success": True, "config": config}
+    except FileNotFoundError:
+        return {"success": True, "config": {}}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
