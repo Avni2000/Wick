@@ -15,6 +15,8 @@ import os
 from wick.backtest_runner import run_backtest
 from wick.live_trader import LiveTrader
 from wick.trade_journal import TradeJournal
+from wick import file_manager
+from wick import template_manager
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
@@ -59,6 +61,22 @@ class DeploymentConfig(BaseModel):
 
 class ConfigUpdate(BaseModel):
     api_key: str
+
+
+class StrategyFileCreate(BaseModel):
+    filename: str
+    content: str
+    description: str = ""
+
+
+class StrategyFileBacktest(BaseModel):
+    filename: str
+    ticker: str
+    start_date: str
+    end_date: str
+    cash: float = 1000000.0
+    commission: float = 0.002
+    interval: str = None
 
 
 # In-memory active deployments and traders
@@ -233,6 +251,121 @@ async def update_config(config_update: ConfigUpdate):
         config['api_key'] = config_update.api_key
         save_config(config)
         return {"success": True, "message": "Configuration updated successfully"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# Strategy File Management Endpoints
+
+@app.get("/api/strategies")
+async def list_strategies():
+    """List all custom strategy files."""
+    try:
+        files = file_manager.list_strategy_files()
+        return {"success": True, "files": files}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/strategies")
+async def save_strategy(strategy: StrategyFileCreate):
+    """Create or update a strategy file."""
+    try:
+        result = file_manager.save_strategy_file(
+            strategy.filename, 
+            strategy.content, 
+            strategy.description
+        )
+        return {"success": True, "result": result}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/strategies/templates")
+async def list_templates():
+    """List available strategy templates."""
+    try:
+        templates = template_manager.list_templates()
+        return {"success": True, "templates": templates}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/strategies/templates/{filename}")
+async def get_template(filename: str):
+    """Get strategy template content."""
+    try:
+        content = template_manager.load_template(filename)
+        return {"success": True, "content": content}
+    except FileNotFoundError:
+        return {"success": False, "error": "Template not found"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/strategies/{filename}")
+async def get_strategy(filename: str):
+    """Get strategy file content."""
+    try:
+        content = file_manager.load_strategy_file(filename)
+        if content is None:
+            return {"success": False, "error": "File not found"}
+        return {"success": True, "content": content}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/api/strategies/{filename}")
+async def delete_strategy(filename: str):
+    """Delete a strategy file."""
+    try:
+        success = file_manager.delete_strategy_file(filename)
+        if not success:
+            return {"success": False, "error": "File not found"}
+        return {"success": True, "message": "File deleted successfully"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/strategies/{filename}/validate")
+async def validate_strategy(filename: str):
+    """Validate a strategy file."""
+    try:
+        content = file_manager.load_strategy_file(filename)
+        if content is None:
+            return {"success": False, "error": "File not found"}
+        
+        result = file_manager.validate_strategy_file(content)
+        return {"success": True, "validation": result}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/strategies/backtest")
+async def backtest_strategy_file(config: StrategyFileBacktest):
+    """Run backtest for a strategy file."""
+    try:
+        # Load strategy content
+        content = file_manager.load_strategy_file(config.filename)
+        if content is None:
+            # Check if it's a template
+            try:
+                content = template_manager.load_template(config.filename)
+            except FileNotFoundError:
+                return {"success": False, "error": "File not found"}
+        
+        # Run backtest
+        results = run_backtest(
+            ticker=config.ticker,
+            start=config.start_date,
+            end=config.end_date,
+            strategy_code=content,
+            cash=config.cash,
+            commission=config.commission,
+            interval=config.interval
+        )
+        
+        return {"success": True, "results": results}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

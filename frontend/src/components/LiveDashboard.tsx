@@ -58,7 +58,9 @@ export default function LiveDashboard({
     }
   }, [])
 
-  const handleDeploy = async () => {
+  const [showDeployWarning, setShowDeployWarning] = useState(false)
+
+  const executeDeploy = async () => {
     if (!strategyCode) {
       alert('Please create a strategy first')
       return
@@ -90,6 +92,14 @@ export default function LiveDashboard({
     } catch (error) {
       alert('Failed to deploy: ' + error)
       addLog(`Deployment failed: ${error}`)
+    }
+  }
+
+  const handleDeployClick = () => {
+    if (mode === 'live') {
+      setShowDeployWarning(true)
+    } else {
+      executeDeploy()
     }
   }
 
@@ -247,8 +257,8 @@ export default function LiveDashboard({
                   type="button"
                   onClick={() => setMode('paper')}
                   className={`p-4 rounded-lg border-2 transition-all ${mode === 'paper'
-                      ? 'border-green-500 bg-green-900/30'
-                      : 'border-dark-border bg-dark-bg hover:border-green-700'
+                    ? 'border-green-500 bg-green-900/30'
+                    : 'border-dark-border bg-dark-bg hover:border-green-700'
                     }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -266,8 +276,8 @@ export default function LiveDashboard({
                   type="button"
                   onClick={() => setMode('live')}
                   className={`p-4 rounded-lg border-2 transition-all ${mode === 'live'
-                      ? 'border-red-500 bg-red-900/30'
-                      : 'border-dark-border bg-dark-bg hover:border-red-700'
+                    ? 'border-red-500 bg-red-900/30'
+                    : 'border-dark-border bg-dark-bg hover:border-red-700'
                     }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -310,7 +320,7 @@ export default function LiveDashboard({
                 ⚙️ Config
               </button>
               <button
-                onClick={handleDeploy}
+                onClick={handleDeployClick}
                 disabled={!strategyCode}
                 className={`flex-1 px-4 py-2 text-white rounded transition-colors ${mode === 'live'
                   ? 'bg-red-600 hover:bg-red-700 disabled:bg-gray-600'
@@ -479,6 +489,53 @@ export default function LiveDashboard({
           )}
         </div>
       </div>
+
+      {/* Live Deployment Warning Modal */}
+      {showDeployWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-dark-surface p-6 rounded-lg border border-red-600 w-[500px] shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center gap-3 mb-4 text-red-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h3 className="text-xl font-bold text-white">Confirm Live Deployment</h3>
+            </div>
+
+            <div className="mb-6 space-y-3">
+              <p className="text-dark-text">
+                You are about to deploy this strategy to <span className="font-bold text-red-400">LIVE TRADING</span> environment.
+              </p>
+              <div className="bg-red-900/20 border border-red-800 p-3 rounded text-sm text-red-200">
+                <p className="font-bold mb-1">⚠️ Risk Warning:</p>
+                <ul className="list-disc list-inside space-y-1 opacity-90">
+                  <li>Real funds will be used for trading.</li>
+                  <li>Trades will be executed automatically based on your strategy.</li>
+                  <li>Ensure your API key is correctly configured.</li>
+                  <li>You are responsible for any financial losses.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeployWarning(false)}
+                className="px-4 py-2 text-dark-text hover:bg-dark-bg rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeployWarning(false)
+                  executeDeploy()
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors font-bold flex items-center gap-2"
+              >
+                <span>🚀</span> Confirm & Deploy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ApiKeyModal
         isOpen={isConfigOpen}

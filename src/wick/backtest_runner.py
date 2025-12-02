@@ -86,7 +86,14 @@ def run_backtest(ticker: str, start: str, end: str, strategy_code: str,
         
         StrategyClass = namespace.get('WickStrategy')
         if not StrategyClass:
-            raise ValueError("Strategy code must define a 'WickStrategy' class")
+            # Try to find any class that inherits from Strategy
+            for name, obj in namespace.items():
+                if isinstance(obj, type) and issubclass(obj, Strategy) and obj is not Strategy:
+                    StrategyClass = obj
+                    break
+        
+        if not StrategyClass:
+            raise ValueError("Strategy code must define a class inheriting from 'Backtest.Strategy'")
         
         bt = Backtest(data, StrategyClass, cash=cash, commission=commission)
         stats = bt.run()

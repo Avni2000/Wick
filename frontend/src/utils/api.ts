@@ -25,5 +25,11 @@ export const API = {
   deployments: `${API_BASE}/api/deployments`,
   deploymentHistory: (id: string) => `${API_BASE}/api/deployment/${id}/history`,
   config: `${API_BASE}/api/config`,
+  strategies: `${API_BASE}/api/strategies`,
+  templates: `${API_BASE}/api/strategies/templates`,
+  template: (filename: string) => `${API_BASE}/api/strategies/templates/${filename}`,
+  strategy: (filename: string) => `${API_BASE}/api/strategies/${filename}`,
+  validateStrategy: (filename: string) => `${API_BASE}/api/strategies/${filename}/validate`,
+  backtestStrategy: `${API_BASE}/api/strategies/backtest`,
   ws: (clientId: string) => `${WS_BASE}/ws/${clientId}`,
 }
