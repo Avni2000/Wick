@@ -5,18 +5,11 @@ from typing import Dict, Optional, List, Any
 class PublicClient:
     """Client for Public.com API"""
     
-    BASE_URL = "https://public.com/api"  # Verify this base URL, docs say https://public.com/api/docs but usually API is api.public.com or public.com/api
-    # Actually docs say "https://public.com/api/docs/resources/..." so likely https://public.com/api/
-    # Wait, the docs link is public.com/api/docs. The endpoints are listed as /market-data/get-quotes.
-    # I will assume the base is https://public.com/api based on the docs URL structure, but it might be api.public.com.
-    # Let's try to find the base URL in the docs text. "https://public.com/api/docs" is the docs.
-    # Usually it's https://api.public.com/v1 or similar.
-    # Let's check the "Server" or "Host" in examples if any. None.
-    # I'll stick with https://public.com/api for now and make it configurable.
+    BASE_URL = "https://api.public.com/userapigateway/trading/"  
     
     def __init__(self, api_key: str, is_sandbox: bool = False):
         self.api_key = api_key
-        self.base_url = "https://public.com/api" # if is_sandbox else "https://public.com/api" # No sandbox mentioned?
+        self.base_url = BASE_URL 
         self.session = requests.Session()
         self.session.headers.update({
             "Authorization": f"Bearer {api_key}",
